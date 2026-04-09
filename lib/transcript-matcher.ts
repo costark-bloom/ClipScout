@@ -141,7 +141,7 @@ export async function enrichWithTranscripts(
     const rawId = video.id.replace('yt_', '')
     const lines = await fetchTranscript(rawId)
     transcriptResults.push({ video, videoId: rawId, lines })
-    await new Promise((r) => setTimeout(r, 200)) // 200ms between requests = max 5/sec
+    await new Promise((r) => setTimeout(r, 600)) // 600ms between requests = max ~1.5/sec
   }
 
   const withTranscripts: VideoTranscript[] = transcriptResults
