@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: clipscout
+    runtime: node
+    buildCommand: npm install && npm run build
+    startCommand: node_modules/.bin/next start -p $PORT
+    healthCheckPath: /
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: 20.11.0
