@@ -7,111 +7,146 @@ const client = new Anthropic({
 
 const SYSTEM_PROMPT = `You are a video research assistant. Your job is to analyze a video script and identify every phrase, sentence, or clause that describes something visually specific — a moment where B-roll footage would help illustrate what's being said. For each segment, return the exact verbatim text from the script (no paraphrasing), the character start and end indices of that text within the full script, a short visual topic label, and 2-3 optimized search queries. Return only valid JSON — no markdown, no explanation, no preamble. Return an array of segment objects. Segments must not overlap. Every meaningful visual moment should be covered but generic transitions or filler phrases should be skipped.`
 
+const WORDS_PER_CHUNK = 400
+
+// Split script into chunks of ~400 words at paragraph boundaries
+function splitIntoChunks(script: string): Array<{ text: string; offset: number }> {
+  const paragraphs = script.split(/\n\n+/)
+  const chunks: Array<{ text: string; offset: number }> = []
+
+  let currentChunk = ''
+  let currentOffset = 0
+  let chunkStartOffset = 0
+
+  for (const paragraph of paragraphs) {
+    const wordCount = (currentChunk + paragraph).split(/\s+/).filter(Boolean).length
+
+    if (currentChunk && wordCount > WORDS_PER_CHUNK) {
+      // Save current chunk and start a new one
+      chunks.push({ text: currentChunk.trim(), offset: chunkStartOffset })
+      // Find where this paragraph starts in the original script
+      chunkStartOffset = currentOffset
+      currentChunk = paragraph + '\n\n'
+    } else {
+      currentChunk += paragraph + '\n\n'
+    }
+
+    currentOffset = script.indexOf(paragraph, currentOffset) + paragraph.length + 2
+  }
+
+  if (currentChunk.trim()) {
+    chunks.push({ text: currentChunk.trim(), offset: chunkStartOffset })
+  }
+
+  return chunks
+}
+
+function parseClaudeResponse(rawText: string): ScriptSegment[] {
+  let text = rawText.trim()
+
+  if (text.includes('```')) {
+    text = text.replace(/```(?:json)?\n?/g, '').trim()
+  }
+
+  const arrayMatch = text.match(/\[[\s\S]*\]/)
+  if (arrayMatch) text = arrayMatch[0]
+
+  try {
+    const parsed = JSON.parse(text)
+    if (Array.isArray(parsed)) return parsed as ScriptSegment[]
+  } catch {
+    // Attempt partial recovery for truncated responses
+    const objectMatches = text.match(/\{[^{}]*"searchQueries"\s*:\s*\[[^\]]*\][^{}]*\}/g)
+    if (objectMatches && objectMatches.length > 0) {
+      try {
+        const recovered = JSON.parse(`[${objectMatches.join(',')}]`)
+        console.log(`[claude] recovered ${objectMatches.length} segments from truncated response`)
+        return recovered as ScriptSegment[]
+      } catch { /* fall through */ }
+    }
+  }
+
+  return []
+}
+
 function validateSegments(script: string, segments: ScriptSegment[]): ScriptSegment[] {
   const validated: ScriptSegment[] = []
 
   for (const seg of segments) {
-    // First try the indices Claude provided
     const slice = script.slice(seg.startIndex, seg.endIndex)
     if (slice === seg.text) {
       validated.push(seg)
       continue
     }
 
-    // Claude's indices were off — search for the text in the script
     const foundIndex = script.indexOf(seg.text)
     if (foundIndex !== -1) {
-      validated.push({
-        ...seg,
-        startIndex: foundIndex,
-        endIndex: foundIndex + seg.text.length,
-      })
+      validated.push({ ...seg, startIndex: foundIndex, endIndex: foundIndex + seg.text.length })
       continue
     }
 
-    // Try a case-insensitive match as last resort
     const lower = script.toLowerCase()
     const foundLower = lower.indexOf(seg.text.toLowerCase())
     if (foundLower !== -1) {
-      const correctedText = script.slice(foundLower, foundLower + seg.text.length)
       validated.push({
         ...seg,
-        text: correctedText,
+        text: script.slice(foundLower, foundLower + seg.text.length),
         startIndex: foundLower,
         endIndex: foundLower + seg.text.length,
       })
     }
-    // If not found at all, discard the segment
   }
 
   return validated
 }
 
-export async function analyzeScript(script: string): Promise<ScriptSegment[]> {
-  const userMessage = `Analyze this script and return a JSON array of segments. Each object must have: id (string, e.g. seg_1), text (exact verbatim phrase from the script), startIndex (number), endIndex (number), topic (short visual label), searchQueries (array of 2-3 strings), chapter (integer starting from 1 — group segments into logical thematic chapters based on natural breaks in the script; aim for 3-6 segments per chapter; if the script is short, use 1 chapter). Script: ${script}`
+async function analyzeChunk(
+  chunkText: string,
+  offset: number,
+  chapterNumber: number,
+  chunkIndex: number
+): Promise<ScriptSegment[]> {
+  const userMessage = `Analyze this script excerpt and return a JSON array of segments. Each object must have: id (string, e.g. seg_${chunkIndex}_1), text (exact verbatim phrase from the excerpt), startIndex (number — character index within this excerpt), endIndex (number), topic (short visual label), searchQueries (array of 2-3 strings), chapter (use ${chapterNumber} for all segments in this response). Return only valid JSON with no markdown or explanation.\n\nExcerpt:\n${chunkText}`
 
   const message = await client.messages.create({
     model: 'claude-sonnet-4-6',
-    max_tokens: 8192,
+    max_tokens: 4096,
     system: SYSTEM_PROMPT,
-    messages: [
-      {
-        role: 'user',
-        content: userMessage,
-      },
-    ],
+    messages: [{ role: 'user', content: userMessage }],
   })
 
   const content = message.content[0]
-  if (content.type !== 'text') {
-    throw new Error('Unexpected response type from Claude')
-  }
+  if (content.type !== 'text') return []
 
-  let rawText = content.text.trim()
+  console.log(`[claude] chunk ${chunkIndex} response (first 300 chars):`, content.text.slice(0, 300))
 
-  console.log('[claude] raw response (first 500 chars):', rawText.slice(0, 500))
+  const segments = parseClaudeResponse(content.text)
 
-  // Strip markdown code fences
-  if (rawText.includes('```')) {
-    rawText = rawText.replace(/```(?:json)?\n?/g, '').trim()
-  }
+  // Offset all indices to be relative to the full script
+  return segments.map((seg) => ({
+    ...seg,
+    startIndex: seg.startIndex + offset,
+    endIndex: seg.endIndex + offset,
+    chapter: chapterNumber,
+  }))
+}
 
-  // Extract the JSON array from anywhere in the response
-  const arrayMatch = rawText.match(/\[[\s\S]*\]/)
-  if (arrayMatch) {
-    rawText = arrayMatch[0]
-  }
+export async function analyzeScript(script: string): Promise<ScriptSegment[]> {
+  const chunks = splitIntoChunks(script)
+  console.log(`[claude] split script into ${chunks.length} chunk(s)`)
 
-  console.log('[claude] cleaned text (first 500 chars):', rawText.slice(0, 500))
+  // Analyze all chunks in parallel
+  const chunkResults = await Promise.all(
+    chunks.map((chunk, i) => analyzeChunk(chunk.text, chunk.offset, i + 1, i + 1))
+  )
 
-  let parsed: unknown
-  try {
-    parsed = JSON.parse(rawText)
-  } catch {
-    // Response was likely truncated at max_tokens — recover all complete segment objects
-    console.warn('[claude] JSON parse failed, attempting partial recovery...')
-    const objectMatches = rawText.match(/\{[^{}]*"searchQueries"\s*:\s*\[[^\]]*\][^{}]*\}/g)
-    if (objectMatches && objectMatches.length > 0) {
-      try {
-        parsed = JSON.parse(`[${objectMatches.join(',')}]`)
-        console.log(`[claude] recovered ${objectMatches.length} segments from truncated response`)
-      } catch {
-        console.error('[claude] partial recovery also failed')
-        console.error('[claude] full raw text:', content.text)
-        throw new Error('Claude returned invalid JSON — try a shorter script')
-      }
-    } else {
-      console.error('[claude] full raw text:', content.text)
-      throw new Error('Claude returned invalid JSON — try a shorter script')
-    }
-  }
+  // Flatten, re-ID, and validate against the full script
+  const allSegments = chunkResults
+    .flat()
+    .map((seg, i) => ({ ...seg, id: `seg_${i + 1}` }))
 
-  if (!Array.isArray(parsed)) {
-    throw new Error('Claude response is not an array')
-  }
+  const validated = validateSegments(script, allSegments)
 
-  const segments = parsed as ScriptSegment[]
-  const validated = validateSegments(script, segments)
-
+  console.log(`[claude] total validated segments: ${validated.length}`)
   return validated
 }
