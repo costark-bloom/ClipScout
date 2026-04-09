@@ -85,43 +85,70 @@ function bestChapterTimestamp(
   return bestSeconds
 }
 
+// Returns available YouTube API keys in order
+function getApiKeys(): string[] {
+  return [
+    process.env.YOUTUBE_API_KEY,
+    process.env.YOUTUBE_API_KEY_2,
+    process.env.YOUTUBE_API_KEY_3,
+  ].filter(Boolean) as string[]
+}
+
+// Try each API key in order, rotating on 403 quota errors
+async function fetchWithKeyRotation(buildUrl: (key: string) => string): Promise<Response | null> {
+  const keys = getApiKeys()
+  for (const key of keys) {
+    const res = await fetch(buildUrl(key))
+    if (res.ok) return res
+    if (res.status === 403) {
+      console.warn(`[youtube] Key ending in ...${key.slice(-6)} hit quota/403, trying next key`)
+      continue
+    }
+    // Non-403 error — don't retry with another key
+    console.error(`[youtube] API error: ${res.status}`)
+    return null
+  }
+  console.error('[youtube] All API keys exhausted or quota exceeded')
+  return null
+}
+
 export async function searchYouTube(query: string, maxResults = 5): Promise<VideoResult[]> {
-  const apiKey = process.env.YOUTUBE_API_KEY
-  if (!apiKey) {
-    console.warn('YOUTUBE_API_KEY not set, skipping YouTube search')
+  const keys = getApiKeys()
+  if (keys.length === 0) {
+    console.warn('No YOUTUBE_API_KEY set, skipping YouTube search')
     return []
   }
 
-  const searchParams = new URLSearchParams({
-    part: 'snippet',
-    type: 'video',
-    videoEmbeddable: 'true',
-    maxResults: String(maxResults),
-    q: query,
-    key: apiKey,
+  const res = await fetchWithKeyRotation((key) => {
+    const searchParams = new URLSearchParams({
+      part: 'snippet',
+      type: 'video',
+      videoEmbeddable: 'true',
+      maxResults: String(maxResults),
+      q: query,
+      key,
+    })
+    return `https://www.googleapis.com/youtube/v3/search?${searchParams}`
   })
 
-  const res = await fetch(`https://www.googleapis.com/youtube/v3/search?${searchParams}`)
-  if (!res.ok) {
-    console.error(`YouTube API error: ${res.status}`)
-    return []
-  }
+  if (!res) return []
 
   const data: YouTubeSearchResponse = await res.json()
   if (!data.items || data.items.length === 0) return []
 
   // Fetch video details (duration + full description for chapters) in one batch call
   const videoIds = data.items.map((i) => i.id.videoId).join(',')
-  const detailParams = new URLSearchParams({
-    part: 'snippet,contentDetails',
-    id: videoIds,
-    key: apiKey,
-  })
-
   let detailMap: Record<string, YouTubeVideoItem> = {}
   try {
-    const detailRes = await fetch(`https://www.googleapis.com/youtube/v3/videos?${detailParams}`)
-    if (detailRes.ok) {
+    const detailRes = await fetchWithKeyRotation((key) => {
+      const detailParams = new URLSearchParams({
+        part: 'snippet,contentDetails',
+        id: videoIds,
+        key,
+      })
+      return `https://www.googleapis.com/youtube/v3/videos?${detailParams}`
+    })
+    if (detailRes) {
       const detailData: YouTubeVideoResponse = await detailRes.json()
       for (const item of detailData.items ?? []) {
         detailMap[item.id] = item
