@@ -43,6 +43,7 @@ export interface AppState {
   error: string | null
   setScript: (script: string) => void
   setSegments: (segments: ScriptSegment[]) => void
+  addSegments: (segments: ScriptSegment[]) => void
   addSearchResults: (results: SearchResults[]) => void
   setSearchResults: (results: SearchResults[]) => void
   setActiveSegment: (id: string | null) => void

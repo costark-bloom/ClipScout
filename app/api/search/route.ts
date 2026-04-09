@@ -45,22 +45,22 @@ async function searchForSegment(segment: ScriptSegment): Promise<SearchResults> 
   const dedupedPixabay = deduplicateByUrl(pixabayResults).slice(0, MAX_PER_SOURCE)
   const dedupedYoutube = deduplicateByUrl(youtubeResults).slice(0, MAX_PER_SOURCE)
 
-  // Run all three enrichment calls concurrently
-  const [enrichedPexels, enrichedPixabay, transcriptEnriched] = await Promise.all([
-    enrichWithMetadata(segment.text, dedupedPexels).catch(() => dedupedPexels),
-    enrichWithMetadata(segment.text, dedupedPixabay).catch(() => dedupedPixabay),
+  // Combine Pexels + Pixabay into one Claude call, run alongside transcript enrichment
+  const allStock = [...dedupedPexels, ...dedupedPixabay]
+  const [enrichedStock, transcriptEnriched] = await Promise.all([
+    enrichWithMetadata(segment.text, allStock).catch(() => allStock),
     enrichWithTranscripts(segment.text, dedupedYoutube).catch(() => dedupedYoutube),
   ])
 
-  // If transcript enrichment didn't score all YouTube videos (e.g. transcripts blocked),
-  // fall back to metadata scoring for any that still have no relevanceScore
+  const enrichedPexels = enrichedStock.filter((v) => v.platform === 'pexels')
+  const enrichedPixabay = enrichedStock.filter((v) => v.platform === 'pixabay')
+
+  // Fall back to metadata scoring for any YouTube videos that didn't get transcript scores
   const unscoredYoutube = transcriptEnriched.filter((v) => v.relevanceScore === undefined)
   const scoredYoutube = transcriptEnriched.filter((v) => v.relevanceScore !== undefined)
-
   const metadataFallback = unscoredYoutube.length > 0
     ? await enrichWithMetadata(segment.text, unscoredYoutube).catch(() => unscoredYoutube)
     : []
-
   const enrichedYoutube = [...scoredYoutube, ...metadataFallback]
 
   // Filter out results with very low relevance scores (< 0.2)

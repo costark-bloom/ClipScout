@@ -11,5 +11,6 @@ export interface SavedScript {
   title: string
   content: string
   segment_count: number
+  segments?: import('./types').ScriptSegment[]
   created_at: string
 }

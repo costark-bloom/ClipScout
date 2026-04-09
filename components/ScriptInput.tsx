@@ -11,7 +11,7 @@ const EXAMPLE_SCRIPTS = [
 
 export default function ScriptInput() {
   const router = useRouter()
-  const { setScript, setSegments, setIsAnalyzing, setError, reset } = useAppStore()
+  const { setScript, addSegments, setIsAnalyzing, setError, reset } = useAppStore()
   const [localScript, setLocalScript] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -42,15 +42,31 @@ export default function ScriptInput() {
         body: JSON.stringify({ script: localScript.trim() }),
       })
 
-      if (!analyzeRes.ok) {
+      if (!analyzeRes.ok || !analyzeRes.body) {
         const err = await analyzeRes.json()
         throw new Error(err.error || 'Failed to analyze script')
       }
 
-      const { segments } = await analyzeRes.json()
-      setSegments(segments)
+      // Read NDJSON stream — add segments to store as each chunk completes
+      const reader = analyzeRes.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() ?? ''
+        for (const line of lines) {
+          if (!line.trim()) continue
+          const parsed = JSON.parse(line)
+          if (parsed.error) throw new Error(parsed.error)
+          if (parsed.segments) addSegments(parsed.segments)
+        }
+      }
+
       setIsAnalyzing(false)
-      // Results page takes over from here — it auto-loads chapter 1
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Something went wrong'
       setError(message)

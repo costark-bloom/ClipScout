@@ -133,7 +133,7 @@ export default function ResultsPage() {
       const res = await fetch('/api/scripts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, content: script, segment_count: segments.length }),
+        body: JSON.stringify({ title, content: script, segment_count: segments.length, segments }),
       })
       if (!res.ok) throw new Error('Failed to save')
       setSaveState('saved')

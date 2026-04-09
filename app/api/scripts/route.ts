@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const { title, content, segment_count } = await req.json()
+  const { title, content, segment_count, segments } = await req.json()
   if (!content) {
     return NextResponse.json({ error: 'content is required' }, { status: 400 })
   }
@@ -40,6 +40,7 @@ export async function POST(req: NextRequest) {
       title: title || 'Untitled script',
       content,
       segment_count: segment_count ?? 0,
+      segments: segments ?? null,
     })
     .select('id, title, segment_count, created_at')
     .single()

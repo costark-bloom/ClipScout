@@ -25,6 +25,8 @@ const useAppStore = create<AppStateWithHydration>()(
       setHasHydrated: (value: boolean) => set({ _hasHydrated: value }),
       setScript: (script: string) => set({ script }),
       setSegments: (segments: ScriptSegment[]) => set({ segments }),
+      addSegments: (newSegments: ScriptSegment[]) =>
+        set((state) => ({ segments: [...state.segments, ...newSegments] })),
 
       setSearchResults: (results: SearchResults[]) => set({ searchResults: results }),
 

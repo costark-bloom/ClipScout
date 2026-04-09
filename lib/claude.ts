@@ -10,7 +10,7 @@ const SYSTEM_PROMPT = `You are a video research assistant. Your job is to analyz
 const WORDS_PER_CHUNK = 400
 
 // Split script into chunks of ~400 words at paragraph boundaries
-function splitIntoChunks(script: string): Array<{ text: string; offset: number }> {
+export function splitIntoChunks(script: string): Array<{ text: string; offset: number }> {
   const paragraphs = script.split(/\n\n+/)
   const chunks: Array<{ text: string; offset: number }> = []
 
@@ -69,7 +69,7 @@ function parseClaudeResponse(rawText: string): ScriptSegment[] {
   return []
 }
 
-function validateSegments(script: string, segments: ScriptSegment[]): ScriptSegment[] {
+export function validateSegments(script: string, segments: ScriptSegment[]): ScriptSegment[] {
   const validated: ScriptSegment[] = []
 
   for (const seg of segments) {
@@ -100,7 +100,7 @@ function validateSegments(script: string, segments: ScriptSegment[]): ScriptSegm
   return validated
 }
 
-async function analyzeChunk(
+export async function analyzeChunk(
   chunkText: string,
   offset: number,
   chapterNumber: number,

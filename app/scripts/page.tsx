@@ -21,7 +21,7 @@ function timeAgo(dateStr: string): string {
 export default function ScriptsPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
-  const { setScript, reset } = useAppStore()
+  const { setScript, setSegments, reset } = useAppStore()
 
   const [scripts, setScripts] = useState<SavedScript[]>([])
   const [loading, setLoading] = useState(true)
@@ -40,12 +40,22 @@ export default function ScriptsPage() {
       .finally(() => setLoading(false))
   }, [status])
 
-  const { setIsAnalyzing, setSegments, setError } = useAppStore()
+  const { setIsAnalyzing, setError, addSegments } = useAppStore()
 
   const handleLoad = async (s: SavedScript) => {
     setLoadingId(s.id)
     reset()
     setScript(s.content)
+
+    // Use cached segments if available — skip analysis entirely
+    if (s.segments && s.segments.length > 0) {
+      setSegments(s.segments)
+      router.push('/results')
+      setLoadingId(null)
+      return
+    }
+
+    // No cached segments — run full analysis
     setIsAnalyzing(true)
     router.push('/results')
 
@@ -55,12 +65,26 @@ export default function ScriptsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ script: s.content }),
       })
-      if (!res.ok) {
+      if (!res.ok || !res.body) {
         const err = await res.json()
         throw new Error(err.error || 'Failed to analyze script')
       }
-      const { segments } = await res.json()
-      setSegments(segments)
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() ?? ''
+        for (const line of lines) {
+          if (!line.trim()) continue
+          const parsed = JSON.parse(line)
+          if (parsed.error) throw new Error(parsed.error)
+          if (parsed.segments) addSegments(parsed.segments)
+        }
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong')
     } finally {
