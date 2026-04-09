@@ -94,7 +94,7 @@ function getApiKeys(): string[] {
     process.env.YOUTUBE_API_KEY,
     process.env.YOUTUBE_API_KEY_2,
     process.env.YOUTUBE_API_KEY_3,
-  ].filter((k): k is string => Boolean(k) && !exhaustedKeys.has(k))
+  ].filter((k): k is string => typeof k === 'string' && !exhaustedKeys.has(k))
 }
 
 // Try each API key in order, rotating on 403 quota errors
