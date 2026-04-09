@@ -1,10 +1,12 @@
 import ScriptInput from '@/components/ScriptInput'
 import DisclaimerBanner from '@/components/DisclaimerBanner'
+import HomeHeader from '@/components/HomeHeader'
 
 export default function HomePage() {
   return (
     <div className="min-h-screen bg-gray-950 flex flex-col">
       <DisclaimerBanner />
+      <HomeHeader />
 
       <main className="flex-1 flex flex-col items-center justify-center px-4 py-16">
         {/* Logo / Hero */}
