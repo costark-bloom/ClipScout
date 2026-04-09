@@ -52,26 +52,35 @@ async function fetchTranscript(videoId: string): Promise<TranscriptLine[] | null
     return null
   }
 
+  const start = Date.now()
   try {
     const res = await Promise.race([
       fetch(`https://api.supadata.ai/v1/youtube/transcript?videoId=${videoId}&lang=en`, {
         headers: { 'x-api-key': apiKey },
       }),
       new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('timeout')), 2000)
+        setTimeout(() => reject(new Error('timeout')), 4000)
       ),
     ])
 
+    const elapsed = Date.now() - start
     if (!res.ok) {
-      console.warn(`[transcript] Supadata ${res.status} for ${videoId}`)
+      console.warn(`[transcript] Supadata ${res.status} for ${videoId} (${elapsed}ms)`)
       return null
     }
 
     const data = await res.json()
-    if (!Array.isArray(data.content)) return null
+    if (!Array.isArray(data.content)) {
+      console.warn(`[transcript] No content array for ${videoId} (${elapsed}ms)`)
+      return null
+    }
 
+    console.log(`[transcript] ✓ Got ${data.content.length} lines for ${videoId} (${elapsed}ms)`)
     return data.content as TranscriptLine[]
-  } catch {
+  } catch (err) {
+    const elapsed = Date.now() - start
+    const reason = err instanceof Error ? err.message : 'unknown'
+    console.warn(`[transcript] ${reason} for ${videoId} after ${elapsed}ms`)
     return null
   }
 }
