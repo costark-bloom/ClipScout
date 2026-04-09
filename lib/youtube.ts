@@ -94,6 +94,9 @@ function getApiKeys(): string[] {
     process.env.YOUTUBE_API_KEY,
     process.env.YOUTUBE_API_KEY_2,
     process.env.YOUTUBE_API_KEY_3,
+    process.env.YOUTUBE_API_KEY_4,
+    process.env.YOUTUBE_API_KEY_5,
+    process.env.YOUTUBE_API_KEY_6,
   ].filter((k): k is string => typeof k === 'string' && !exhaustedKeys.has(k))
 }
 
