@@ -58,7 +58,7 @@ async function fetchTranscript(videoId: string): Promise<TranscriptLine[] | null
         headers: { 'x-api-key': apiKey },
       }),
       new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('timeout')), 8000)
+        setTimeout(() => reject(new Error('timeout')), 2000)
       ),
     ])
 
@@ -138,13 +138,23 @@ export async function enrichWithTranscripts(
 ): Promise<VideoResult[]> {
   if (youtubeResults.length === 0) return []
 
-  // Fetch transcripts sequentially with a small delay to avoid Supadata rate limits
+  // Fetch transcripts 3 at a time — safe under 10 req/sec Supadata plan
   const transcriptResults: { video: VideoResult; videoId: string; lines: TranscriptLine[] | null }[] = []
-  for (const video of youtubeResults) {
-    const rawId = video.id.replace('yt_', '')
-    const lines = await fetchTranscript(rawId)
-    transcriptResults.push({ video, videoId: rawId, lines })
-    await new Promise((r) => setTimeout(r, 150)) // 150ms between requests = safe under 10 req/sec
+  const BATCH_SIZE = 3
+  for (let i = 0; i < youtubeResults.length; i += BATCH_SIZE) {
+    const batch = youtubeResults.slice(i, i + BATCH_SIZE)
+    const batchResults = await Promise.all(
+      batch.map(async (video) => {
+        const rawId = video.id.replace('yt_', '')
+        const lines = await fetchTranscript(rawId)
+        return { video, videoId: rawId, lines }
+      })
+    )
+    transcriptResults.push(...batchResults)
+    // Small delay between batches to stay safely under rate limit
+    if (i + BATCH_SIZE < youtubeResults.length) {
+      await new Promise((r) => setTimeout(r, 150))
+    }
   }
 
   const withTranscripts: VideoTranscript[] = transcriptResults
