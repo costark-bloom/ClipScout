@@ -3,6 +3,7 @@ import type { ScriptSegment } from './types'
 
 const client = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
+  maxRetries: 3,
 })
 
 const SYSTEM_PROMPT = `You are a video research assistant. Your job is to analyze a video script and identify every phrase, sentence, or clause that describes something visually specific — a moment where B-roll footage would help illustrate what's being said. For each segment, return the exact verbatim text from the script (no paraphrasing), the character start and end indices of that text within the full script, a short visual topic label, and 2-3 optimized search queries. Return only valid JSON — no markdown, no explanation, no preamble. Return an array of segment objects. Segments must not overlap. Every meaningful visual moment should be covered but generic transitions or filler phrases should be skipped.`

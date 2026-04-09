@@ -1,7 +1,10 @@
 import Anthropic from '@anthropic-ai/sdk'
 import type { VideoResult } from './types'
 
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+const client = new Anthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY,
+  maxRetries: 3,
+})
 
 interface TranscriptLine {
   text: string

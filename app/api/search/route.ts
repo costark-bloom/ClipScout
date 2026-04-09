@@ -111,10 +111,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ results: [] })
     }
 
-    // Process max 4 segments concurrently to stay within Anthropic rate limits
+    // Process max 2 segments concurrently to avoid overwhelming Claude API
     const results = await withConcurrencyLimit(
       segments as ScriptSegment[],
-      4,
+      2,
       searchForSegment
     )
 
