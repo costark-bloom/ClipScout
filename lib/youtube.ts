@@ -85,23 +85,31 @@ function bestChapterTimestamp(
   return bestSeconds
 }
 
-// Returns available YouTube API keys in order
+// Track quota-exhausted keys in memory — persists for the lifetime of the server process
+const exhaustedKeys = new Set<string>()
+
+// Returns available YouTube API keys in order, skipping exhausted ones
 function getApiKeys(): string[] {
   return [
     process.env.YOUTUBE_API_KEY,
     process.env.YOUTUBE_API_KEY_2,
     process.env.YOUTUBE_API_KEY_3,
-  ].filter(Boolean) as string[]
+  ].filter((k): k is string => Boolean(k) && !exhaustedKeys.has(k))
 }
 
 // Try each API key in order, rotating on 403 quota errors
 async function fetchWithKeyRotation(buildUrl: (key: string) => string): Promise<Response | null> {
   const keys = getApiKeys()
+  if (keys.length === 0) {
+    console.error('[youtube] All API keys exhausted or quota exceeded')
+    return null
+  }
   for (const key of keys) {
     const res = await fetch(buildUrl(key))
     if (res.ok) return res
     if (res.status === 403) {
-      console.warn(`[youtube] Key ending in ...${key.slice(-6)} hit quota/403, trying next key`)
+      console.warn(`[youtube] Key ending in ...${key.slice(-6)} hit quota/403, marking exhausted`)
+      exhaustedKeys.add(key)
       continue
     }
     // Non-403 error — don't retry with another key
