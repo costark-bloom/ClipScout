@@ -51,6 +51,7 @@ export default function ScriptInput() {
       const reader = analyzeRes.body.getReader()
       const decoder = new TextDecoder()
       let buffer = ''
+      let totalSegments = 0
 
       while (true) {
         const { done, value } = await reader.read()
@@ -62,8 +63,15 @@ export default function ScriptInput() {
           if (!line.trim()) continue
           const parsed = JSON.parse(line)
           if (parsed.error) throw new Error(parsed.error)
-          if (parsed.segments) addSegments(parsed.segments)
+          if (parsed.segments) {
+            addSegments(parsed.segments)
+            totalSegments += parsed.segments.length
+          }
         }
+      }
+
+      if (totalSegments === 0) {
+        throw new Error('No segments were identified — the AI may be busy. Please try again.')
       }
 
       setIsAnalyzing(false)
