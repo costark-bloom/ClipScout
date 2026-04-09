@@ -1,4 +1,3 @@
-import { YoutubeTranscript } from 'youtube-transcript'
 import Anthropic from '@anthropic-ai/sdk'
 import type { VideoResult } from './types'
 
@@ -42,16 +41,33 @@ function formatTranscript(lines: TranscriptLine[], maxWords = 600): string {
   return parts.join('\n')
 }
 
-// Fetch transcript for a single video — returns null if unavailable
+// Fetch transcript via Supadata — works from cloud servers unlike youtube-transcript
 async function fetchTranscript(videoId: string): Promise<TranscriptLine[] | null> {
+  const apiKey = process.env.SUPADATA_API_KEY
+  if (!apiKey) {
+    console.warn('[transcript] SUPADATA_API_KEY not set, skipping transcript fetch')
+    return null
+  }
+
   try {
-    const raw = await Promise.race([
-      YoutubeTranscript.fetchTranscript(videoId),
+    const res = await Promise.race([
+      fetch(`https://api.supadata.ai/v1/youtube/transcript?videoId=${videoId}&lang=en`, {
+        headers: { 'x-api-key': apiKey },
+      }),
       new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('timeout')), 6000)
+        setTimeout(() => reject(new Error('timeout')), 8000)
       ),
     ])
-    return raw as TranscriptLine[]
+
+    if (!res.ok) {
+      console.warn(`[transcript] Supadata ${res.status} for ${videoId}`)
+      return null
+    }
+
+    const data = await res.json()
+    if (!Array.isArray(data.content)) return null
+
+    return data.content as TranscriptLine[]
   } catch {
     return null
   }
