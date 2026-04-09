@@ -40,7 +40,7 @@ export default function ScriptsPage() {
       .finally(() => setLoading(false))
   }, [status])
 
-  const { setIsAnalyzing, setError, addSegments } = useAppStore()
+  const { setIsAnalyzing, setError, addSegments, setSearchResults, setChapterStatus } = useAppStore()
 
   const handleLoad = async (s: SavedScript) => {
     setLoadingId(s.id)
@@ -61,9 +61,17 @@ export default function ScriptsPage() {
 
     setScript(fullScript.content)
 
-    // Use cached segments if available — skip analysis entirely
+    // Use cached segments + search results if available — skip everything
     if (fullScript.segments && fullScript.segments.length > 0) {
       setSegments(fullScript.segments)
+
+      if (fullScript.search_results && fullScript.search_results.length > 0) {
+        setSearchResults(fullScript.search_results)
+        // Mark all chapters as done so results page renders immediately
+        const chapters = [...new Set(fullScript.segments.map((seg) => seg.chapter ?? 1))]
+        for (const ch of chapters) setChapterStatus(ch, 'done')
+      }
+
       router.push('/results')
       setLoadingId(null)
       return
