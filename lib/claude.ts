@@ -87,10 +87,23 @@ export async function analyzeScript(script: string): Promise<ScriptSegment[]> {
   let parsed: unknown
   try {
     parsed = JSON.parse(rawText)
-  } catch (e) {
-    console.error('[claude] JSON parse error:', e)
-    console.error('[claude] full raw text:', content.text)
-    throw new Error('Claude returned invalid JSON — try a shorter script')
+  } catch {
+    // Response was likely truncated at max_tokens — recover all complete segment objects
+    console.warn('[claude] JSON parse failed, attempting partial recovery...')
+    const objectMatches = rawText.match(/\{[^{}]*"searchQueries"\s*:\s*\[[^\]]*\][^{}]*\}/g)
+    if (objectMatches && objectMatches.length > 0) {
+      try {
+        parsed = JSON.parse(`[${objectMatches.join(',')}]`)
+        console.log(`[claude] recovered ${objectMatches.length} segments from truncated response`)
+      } catch {
+        console.error('[claude] partial recovery also failed')
+        console.error('[claude] full raw text:', content.text)
+        throw new Error('Claude returned invalid JSON — try a shorter script')
+      }
+    } else {
+      console.error('[claude] full raw text:', content.text)
+      throw new Error('Claude returned invalid JSON — try a shorter script')
+    }
   }
 
   if (!Array.isArray(parsed)) {
