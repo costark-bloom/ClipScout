@@ -104,19 +104,29 @@ async function fetchWithKeyRotation(buildUrl: (key: string) => string): Promise<
     console.error('[youtube] All API keys exhausted or quota exceeded')
     return null
   }
-  for (const key of keys) {
+  for (let i = 0; i < keys.length; i++) {
+    const key = keys[i]
+    const keyLabel = `key${i + 1}(...${key.slice(-6)})`
     const res = await fetch(buildUrl(key))
-    if (res.ok) return res
+    if (res.ok) {
+      if (i > 0) {
+        console.log(`[youtube] ✓ Successfully used fallback ${keyLabel}`)
+      }
+      return res
+    }
     if (res.status === 403) {
-      console.warn(`[youtube] Key ending in ...${key.slice(-6)} hit quota/403, marking exhausted`)
+      console.warn(`[youtube] ${keyLabel} hit quota/403, marking exhausted — rotating to next key`)
       exhaustedKeys.add(key)
+      const remaining = keys.length - i - 1
+      if (remaining > 0) {
+        console.log(`[youtube] ${remaining} key(s) remaining to try`)
+      }
       continue
     }
-    // Non-403 error — don't retry with another key
-    console.error(`[youtube] API error: ${res.status}`)
+    console.error(`[youtube] ${keyLabel} returned unexpected error: ${res.status}`)
     return null
   }
-  console.error('[youtube] All API keys exhausted or quota exceeded')
+  console.error('[youtube] All API keys exhausted or quota exceeded — YouTube results unavailable')
   return null
 }
 
