@@ -26,6 +26,7 @@ export default function ScriptsPage() {
   const [scripts, setScripts] = useState<SavedScript[]>([])
   const [loading, setLoading] = useState(true)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [loadingId, setLoadingId] = useState<string | null>(null)
 
   useEffect(() => {
     if (status === 'unauthenticated') router.replace('/')
@@ -39,10 +40,33 @@ export default function ScriptsPage() {
       .finally(() => setLoading(false))
   }, [status])
 
-  const handleLoad = (s: SavedScript) => {
+  const { setIsAnalyzing, setSegments, setError } = useAppStore()
+
+  const handleLoad = async (s: SavedScript) => {
+    setLoadingId(s.id)
     reset()
     setScript(s.content)
-    router.push('/')
+    setIsAnalyzing(true)
+    router.push('/results')
+
+    try {
+      const res = await fetch('/api/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ script: s.content }),
+      })
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error || 'Failed to analyze script')
+      }
+      const { segments } = await res.json()
+      setSegments(segments)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Something went wrong')
+    } finally {
+      setIsAnalyzing(false)
+      setLoadingId(null)
+    }
   }
 
   const handleDelete = async (id: string) => {
@@ -132,12 +156,20 @@ export default function ScriptsPage() {
                 <div className="flex items-center gap-2 shrink-0">
                   <button
                     onClick={() => handleLoad(s)}
-                    className="flex items-center gap-1.5 text-xs text-indigo-400 hover:text-indigo-300 border border-indigo-900/60 hover:border-indigo-800 px-3 py-1.5 rounded-lg transition-all"
+                    disabled={loadingId === s.id}
+                    className="flex items-center gap-1.5 text-xs text-indigo-400 hover:text-indigo-300 border border-indigo-900/60 hover:border-indigo-800 px-3 py-1.5 rounded-lg transition-all disabled:opacity-50"
                   >
-                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z" />
-                    </svg>
-                    Load
+                    {loadingId === s.id ? (
+                      <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                      </svg>
+                    ) : (
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z" />
+                      </svg>
+                    )}
+                    {loadingId === s.id ? 'Analyzing…' : 'Load'}
                   </button>
                   <button
                     onClick={() => handleDelete(s.id)}
