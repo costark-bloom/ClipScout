@@ -45,11 +45,25 @@ export default function ScriptsPage() {
   const handleLoad = async (s: SavedScript) => {
     setLoadingId(s.id)
     reset()
-    setScript(s.content)
+
+    // Fetch full script (content + segments) from individual endpoint
+    let fullScript: SavedScript
+    try {
+      const r = await fetch(`/api/scripts/${s.id}`)
+      if (!r.ok) throw new Error('Failed to load script')
+      const { script } = await r.json()
+      fullScript = script
+    } catch {
+      setError('Failed to load script')
+      setLoadingId(null)
+      return
+    }
+
+    setScript(fullScript.content)
 
     // Use cached segments if available — skip analysis entirely
-    if (s.segments && s.segments.length > 0) {
-      setSegments(s.segments)
+    if (fullScript.segments && fullScript.segments.length > 0) {
+      setSegments(fullScript.segments)
       router.push('/results')
       setLoadingId(null)
       return
@@ -63,7 +77,7 @@ export default function ScriptsPage() {
       const res = await fetch('/api/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ script: s.content }),
+        body: JSON.stringify({ script: fullScript.content }),
       })
       if (!res.ok || !res.body) {
         const err = await res.json()
