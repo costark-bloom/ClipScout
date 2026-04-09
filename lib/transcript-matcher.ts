@@ -135,14 +135,18 @@ export async function enrichWithTranscripts(
 ): Promise<VideoResult[]> {
   if (youtubeResults.length === 0) return []
 
-  // Fetch all transcripts in parallel
-  const transcriptResults = await Promise.all(
-    youtubeResults.map(async (video) => {
-      const rawId = video.id.replace('yt_', '')
-      const lines = await fetchTranscript(rawId)
-      return { video, videoId: rawId, lines }
-    })
-  )
+  // Only fetch transcripts for top 2 to conserve Supadata quota and avoid rate limits
+  const toEnrich = youtubeResults.slice(0, 2)
+  const remainder = youtubeResults.slice(2)
+
+  // Fetch transcripts sequentially with a small delay to avoid Supadata rate limits
+  const transcriptResults: { video: VideoResult; videoId: string; lines: TranscriptLine[] | null }[] = []
+  for (const video of toEnrich) {
+    const rawId = video.id.replace('yt_', '')
+    const lines = await fetchTranscript(rawId)
+    transcriptResults.push({ video, videoId: rawId, lines })
+    await new Promise((r) => setTimeout(r, 200)) // 200ms between requests = max 5/sec
+  }
 
   const withTranscripts: VideoTranscript[] = transcriptResults
     .filter((r) => r.lines !== null && r.lines!.length > 0)
@@ -187,5 +191,5 @@ export async function enrichWithTranscripts(
   // Sort by relevance score descending, then append videos without transcripts
   const sorted = enriched.sort((a, b) => (b.relevanceScore ?? 0) - (a.relevanceScore ?? 0))
 
-  return [...sorted, ...withoutTranscripts]
+  return [...sorted, ...withoutTranscripts, ...remainder]
 }
