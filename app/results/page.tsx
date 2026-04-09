@@ -37,6 +37,8 @@ export default function ResultsPage() {
   const [visibleChapters, setVisibleChapters] = useState<number[]>([])
   const { isAuthenticated, isLoading: authLoading } = useAuthGate()
   const [showGate, setShowGate] = useState(false)
+  const [progress, setProgress] = useState(0)
+  const progressRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const allChapters = getChapters(segments)
   const totalClips = searchResults.reduce((sum, r) => sum + r.videos.length, 0)
@@ -68,6 +70,31 @@ export default function ResultsPage() {
     if (isAuthenticated) setShowGate(false)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chapterStatus, isAuthenticated, authLoading])
+
+  // Animate progress bar during analysis
+  useEffect(() => {
+    if (isAnalyzing) {
+      setProgress(0)
+      // Ease toward 85% over ~25s — never reaches 100% until done
+      progressRef.current = setInterval(() => {
+        setProgress((p) => {
+          const remaining = 85 - p
+          return p + remaining * 0.04
+        })
+      }, 300)
+    } else {
+      if (progressRef.current) clearInterval(progressRef.current)
+      if (segments.length > 0) {
+        setProgress(100)
+        setTimeout(() => setProgress(0), 600)
+      } else {
+        setProgress(0)
+      }
+    }
+    return () => {
+      if (progressRef.current) clearInterval(progressRef.current)
+    }
+  }, [isAnalyzing, segments.length])
 
   // Track which chapters are visible in the UI
   useEffect(() => {
@@ -182,6 +209,17 @@ export default function ResultsPage() {
 
       {/* Page content — blurred when gate is showing */}
       <div className={showGate ? 'pointer-events-none select-none filter blur-sm brightness-50 transition-all duration-300' : 'transition-all duration-300'}>
+
+      {/* Top progress bar */}
+      {progress > 0 && (
+        <div className="fixed top-0 left-0 right-0 z-50 h-0.5 bg-gray-900">
+          <div
+            className="h-full bg-indigo-500 transition-all duration-300 ease-out"
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+      )}
+
       <DisclaimerBanner />
 
       {/* Mobile: chapter pill row */}
