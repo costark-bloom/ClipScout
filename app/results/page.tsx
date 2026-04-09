@@ -350,7 +350,7 @@ export default function ResultsPage() {
                     </div>
 
                     {/* Chapter content */}
-                    {isVisible && (status === 'loading' || status === 'done') ? (
+                    {isVisible && (status === 'loading' || status === 'done' || status === 'idle') ? (
                       <div className="space-y-5">
                         {chapterSegments.map((segment, i) => {
                           const segIndex = segments.findIndex(s => s.id === segment.id)
