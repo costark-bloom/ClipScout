@@ -38,6 +38,7 @@ export default function ResultsPage() {
   const { isAuthenticated, isLoading: authLoading } = useAuthGate()
   const [showGate, setShowGate] = useState(false)
   const [progress, setProgress] = useState(0)
+  const [loadingStage, setLoadingStage] = useState<'analyzing' | 'searching'>('analyzing')
   const progressRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const allChapters = getChapters(segments)
@@ -71,30 +72,42 @@ export default function ResultsPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chapterStatus, isAuthenticated, authLoading])
 
-  // Animate progress bar during analysis
+  const chapter1 = allChapters[0]
+  const chapter1Status = chapter1 !== undefined ? (chapterStatus[chapter1] ?? 'idle') : 'idle'
+  const isLoading = isAnalyzing || (segments.length > 0 && chapter1Status !== 'done')
+
+  // Drive progress bar: 0-50% while analyzing, 50-95% while searching, 100% when done
   useEffect(() => {
+    if (progressRef.current) clearInterval(progressRef.current)
+
     if (isAnalyzing) {
-      setProgress(0)
-      // Ease toward 85% over ~25s — never reaches 100% until done
+      setLoadingStage('analyzing')
+      setProgress((p) => Math.max(p, 0))
       progressRef.current = setInterval(() => {
         setProgress((p) => {
-          const remaining = 85 - p
-          return p + remaining * 0.04
+          const target = 48
+          if (p >= target) return p
+          return p + (target - p) * 0.05
         })
       }, 300)
-    } else {
-      if (progressRef.current) clearInterval(progressRef.current)
-      if (segments.length > 0) {
-        setProgress(100)
-        setTimeout(() => setProgress(0), 600)
-      } else {
-        setProgress(0)
-      }
+    } else if (segments.length > 0 && chapter1Status !== 'done') {
+      setLoadingStage('searching')
+      setProgress(50)
+      progressRef.current = setInterval(() => {
+        setProgress((p) => {
+          const target = 93
+          if (p >= target) return p
+          return p + (target - p) * 0.04
+        })
+      }, 300)
+    } else if (chapter1Status === 'done') {
+      setProgress(100)
     }
+
     return () => {
       if (progressRef.current) clearInterval(progressRef.current)
     }
-  }, [isAnalyzing, segments.length])
+  }, [isAnalyzing, segments.length, chapter1Status])
 
   // Track which chapters are visible in the UI
   useEffect(() => {
@@ -210,16 +223,6 @@ export default function ResultsPage() {
       {/* Page content — blurred when gate is showing */}
       <div className={showGate ? 'pointer-events-none select-none filter blur-sm brightness-50 transition-all duration-300' : 'transition-all duration-300'}>
 
-      {/* Top progress bar */}
-      {progress > 0 && (
-        <div className="fixed top-0 left-0 right-0 z-50 h-0.5 bg-gray-900">
-          <div
-            className="h-full bg-indigo-500 transition-all duration-300 ease-out"
-            style={{ width: `${progress}%` }}
-          />
-        </div>
-      )}
-
       <DisclaimerBanner />
 
       {/* Mobile: chapter pill row */}
@@ -298,12 +301,16 @@ export default function ResultsPage() {
                 <p className="text-xs font-semibold text-gray-200">
                   {isAnalyzing
                     ? 'Analyzing script…'
+                    : isLoading
+                    ? 'Finding footage…'
                     : segments.length > 0
                     ? `${segments.length} segments · ${allChapters.length} chapters · ${totalClips} clips loaded`
                     : 'ClipScout'}
                 </p>
-                {isAnalyzing && (
-                  <p className="text-[10px] text-gray-600">Claude is reading your script…</p>
+                {isLoading && (
+                  <p className="text-[10px] text-gray-600">
+                    {isAnalyzing ? 'Claude is reading your script…' : 'Searching YouTube, Pexels & Pixabay…'}
+                  </p>
                 )}
               </div>
             </div>
@@ -352,15 +359,15 @@ export default function ResultsPage() {
             </div>
           </div>
 
-          {/* Analyzing skeleton */}
-          {isAnalyzing && (
+          {/* Loading overlay — stays until chapter 1 videos are ready */}
+          {isLoading && (
             <div className="flex-1 overflow-y-auto">
-              <LoadingState stage="analyzing" />
+              <LoadingState stage={loadingStage} progress={progress} segmentCount={segments.length} />
             </div>
           )}
 
           {/* Chapter-by-chapter results */}
-          {!isAnalyzing && segments.length > 0 && (
+          {!isLoading && segments.length > 0 && (
             <div className="flex-1 overflow-y-auto px-6 py-6 space-y-10">
               {allChapters.map((chapterNum, chapterIdx) => {
                 const chapterSegments = segments.filter((s) => (s.chapter ?? 1) === chapterNum)
@@ -461,7 +468,7 @@ export default function ResultsPage() {
           )}
 
           {/* Empty state */}
-          {!isAnalyzing && segments.length === 0 && script && (
+          {!isLoading && segments.length === 0 && script && (
             <div className="flex-1 flex items-center justify-center p-8 text-center">
               <div className="space-y-3">
                 <p className="text-sm text-gray-500">No visual segments were identified in your script.</p>

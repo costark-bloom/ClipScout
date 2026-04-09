@@ -2,10 +2,11 @@
 
 interface LoadingStateProps {
   stage: 'analyzing' | 'searching'
+  progress: number
   segmentCount?: number
 }
 
-export default function LoadingState({ stage, segmentCount }: LoadingStateProps) {
+export default function LoadingState({ stage, progress, segmentCount }: LoadingStateProps) {
   return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] gap-8 animate-fade-in">
       {/* Animated orb */}
@@ -24,17 +25,28 @@ export default function LoadingState({ stage, segmentCount }: LoadingStateProps)
         </div>
       </div>
 
-      <div className="text-center space-y-2">
-        <h2 className="text-xl font-semibold text-gray-100">
-          {stage === 'analyzing' ? 'Analyzing your script…' : 'Searching for footage…'}
-        </h2>
-        <p className="text-sm text-gray-400 max-w-sm text-balance">
-          {stage === 'analyzing'
-            ? 'Claude is identifying visual moments and generating search queries for each segment.'
-            : segmentCount
-            ? `Finding B-roll across YouTube, Pexels, and Pixabay for ${segmentCount} segment${segmentCount !== 1 ? 's' : ''}…`
-            : 'Searching YouTube, Pexels, and Pixabay in parallel…'}
-        </p>
+      <div className="text-center space-y-4 w-full max-w-sm px-4">
+        <div className="space-y-2">
+          <h2 className="text-xl font-semibold text-gray-100">
+            {stage === 'analyzing' ? 'Analyzing your script…' : 'Finding footage…'}
+          </h2>
+          <p className="text-sm text-gray-400 text-balance">
+            {stage === 'analyzing'
+              ? 'Claude is identifying visual moments and generating search queries.'
+              : segmentCount
+              ? `Searching YouTube, Pexels & Pixabay for ${segmentCount} segment${segmentCount !== 1 ? 's' : ''}…`
+              : 'Searching YouTube, Pexels & Pixabay…'}
+          </p>
+        </div>
+
+        {/* Progress bar */}
+        <div className="w-full bg-gray-800 rounded-full h-1.5 overflow-hidden">
+          <div
+            className="h-full bg-indigo-500 rounded-full transition-all duration-500 ease-out"
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+        <p className="text-xs text-gray-600">{Math.round(progress)}%</p>
       </div>
 
       {/* Skeleton cards */}
