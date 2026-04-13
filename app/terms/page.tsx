@@ -226,8 +226,8 @@ export default function TermsPage() {
             <h2 className="text-lg font-semibold text-gray-100 mb-3">14. Contact</h2>
             <p>
               If you have any questions about these Terms of Use, please contact us at{' '}
-              <a href="mailto:legal@clipscout.app" className="text-indigo-400 hover:text-indigo-300">
-                legal@clipscout.app
+              <a href="mailto:colestark9@gmail.com" className="text-indigo-400 hover:text-indigo-300">
+                colestark9@gmail.com
               </a>.
             </p>
           </section>

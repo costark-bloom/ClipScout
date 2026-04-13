@@ -114,8 +114,8 @@ export default function PrivacyPage() {
             <p className="text-sm">
               You may request deletion of all YouTube API data associated with your account at any time by deleting
               your saved scripts or by contacting us at{' '}
-              <a href="mailto:privacy@clipscout.app" className="text-indigo-400 hover:text-indigo-300">
-                privacy@clipscout.app
+              <a href="mailto:colestark9@gmail.com" className="text-indigo-400 hover:text-indigo-300">
+                colestark9@gmail.com
               </a>. We will process deletion requests within 30 days.
             </p>
 
@@ -254,8 +254,8 @@ export default function PrivacyPage() {
             </ul>
             <p className="mt-3">
               To exercise any of these rights, contact us at{' '}
-              <a href="mailto:privacy@clipscout.app" className="text-indigo-400 hover:text-indigo-300">
-                privacy@clipscout.app
+              <a href="mailto:colestark9@gmail.com" className="text-indigo-400 hover:text-indigo-300">
+                colestark9@gmail.com
               </a>. We will respond to requests within 30 days.
             </p>
           </section>
@@ -297,7 +297,7 @@ export default function PrivacyPage() {
             </p>
             <div className="mt-3 bg-gray-900 border border-gray-800 rounded-xl p-4 text-sm space-y-1">
               <p className="text-gray-200 font-medium">ClipScout</p>
-              <p>Email: <a href="mailto:privacy@clipscout.app" className="text-indigo-400 hover:text-indigo-300">privacy@clipscout.app</a></p>
+              <p>Email: <a href="mailto:colestark9@gmail.com" className="text-indigo-400 hover:text-indigo-300">colestark9@gmail.com</a></p>
               <p>Website: <a href="https://www.clipscout.app" className="text-indigo-400 hover:text-indigo-300">www.clipscout.app</a></p>
             </div>
           </section>
