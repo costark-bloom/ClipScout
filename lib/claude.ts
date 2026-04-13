@@ -8,11 +8,18 @@ const client = new Anthropic({
 
 const SYSTEM_PROMPT = `You are a video research assistant. Your job is to analyze a video script and identify every phrase, sentence, or clause that describes something visually specific — a moment where B-roll footage would help illustrate what's being said.
 
-For each segment:
-- Return the exact verbatim text from the script (no paraphrasing)
-- Return the character start and end indices within the excerpt
-- Write a short visual topic label
-- Write 2-3 search queries that are SPECIFIC and CONTEXTUAL — always incorporate the script's topic, location, event name, or key proper nouns into the queries. Never write generic queries that could apply to any script. For example, if the script is about the Redbox Bowl at AT&T Park, a query for "crowded sideline" should be "Redbox Bowl crowded sideline AT&T Park" not just "crowded football sideline".
+For each segment, generate EXACTLY 3 search queries structured as follows:
+
+QUERY 1 — Visual concept first: Describe precisely what the camera would see. ALWAYS name the specific sport, activity, or subject type explicitly (e.g. "american football", "basketball", "cooking", "surgery"). NEVER use obscure event names, team names, or venue names as the primary term — stock footage sites don't carry footage of specific games or local venues. Example: instead of "Redbox Bowl sideline crowded", write "american football coaches players crowded sideline".
+
+QUERY 2 — Setting + visual: Add the general setting or context (e.g. "college football game sideline bench coaches overflow crowd"). Use the broader category, not the specific event.
+
+QUERY 3 — Visual variation: A third distinct visual angle on the same moment. Only use a proper noun (event, location, person) if it is world-famous and would appear in stock footage (e.g. "Super Bowl", "World Cup", "Times Square", "Eiffel Tower"). Otherwise write another visual variation.
+
+Additional rules:
+- Always name the sport/activity type explicitly in at least the first two queries
+- Queries must describe what is VISUALLY IN THE FRAME, not the narrative meaning
+- Never write queries so specific they'd return zero results (obscure bowl games, minor-league teams, local venues)
 
 Return only valid JSON — no markdown, no explanation, no preamble. Return an array of segment objects. Segments must not overlap. Every meaningful visual moment should be covered but generic transitions or filler phrases should be skipped.`
 
@@ -168,6 +175,43 @@ export async function analyzeChunk(
     endIndex: seg.endIndex + offset,
     chapter: chapterNumber,
   }))
+}
+
+// When initial search results are all low-relevance, generate pure visual fallback queries.
+// Strips proper nouns and focuses on what the camera would literally show.
+export async function generateFallbackQueries(segmentText: string, topic: string): Promise<string[]> {
+  try {
+    const message = await client.messages.create({
+      model: 'claude-haiku-4-5',
+      max_tokens: 200,
+      messages: [{
+        role: 'user',
+        content: `A stock footage search returned poor results for this script segment. Generate 2 new search queries that are purely visual and highly searchable on stock footage sites.
+
+Rules:
+- Describe only what the CAMERA WOULD LITERALLY SEE (actions, objects, settings, body language)
+- Always explicitly name the sport, activity, or subject type (e.g. "american football", "basketball", "cooking", "medical")
+- DO NOT use specific event names, team names, venue names, or any proper nouns
+- Use broad, generic terms that stock footage sites would have
+
+Topic hint: ${topic}
+Script segment: "${segmentText.slice(0, 300)}"
+
+Return ONLY a JSON array of 2 query strings. No markdown, no explanation.`,
+      }],
+    })
+    const text = message.content[0].type === 'text' ? message.content[0].text.trim() : ''
+    const match = text.match(/\[[\s\S]*\]/)
+    if (!match) return []
+    const parsed = JSON.parse(match[0])
+    if (Array.isArray(parsed) && parsed.every((q) => typeof q === 'string')) {
+      console.log('[claude] fallback queries:', parsed)
+      return parsed as string[]
+    }
+    return []
+  } catch {
+    return []
+  }
 }
 
 export async function analyzeScript(script: string): Promise<ScriptSegment[]> {

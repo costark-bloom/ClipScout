@@ -7,6 +7,7 @@ import { searchPixabay } from '@/lib/pixabay'
 import { searchFreepik } from '@/lib/freepik'
 import { enrichWithTranscripts } from '@/lib/transcript-matcher'
 import { enrichWithMetadata } from '@/lib/metadata-matcher'
+import { generateFallbackQueries } from '@/lib/claude'
 import { supabase } from '@/lib/supabase'
 import type { ScriptSegment, SearchResults, VideoResult } from '@/lib/types'
 
@@ -58,10 +59,10 @@ async function searchForSegment(
   const dedupedYoutube = deduplicateByUrl(youtubeResults).slice(0, MAX_PER_SOURCE)
   const dedupedFreepik = deduplicateByUrl(freepikResults).slice(0, MAX_PER_SOURCE)
 
-  // Enrich all stock sources (Pexels + Pixabay + Freepik) in one Claude call
+  // Enrich all stock sources (Pexels + Pixabay + Freepik) in one Claude call, passing topic for sport-mismatch detection
   const allStock = [...dedupedPexels, ...dedupedPixabay, ...dedupedFreepik]
   const [enrichedStock, transcriptEnriched] = await Promise.all([
-    enrichWithMetadata(segment.text, allStock).catch(() => allStock),
+    enrichWithMetadata(segment.text, allStock, segment.topic).catch(() => allStock),
     enrichWithTranscripts(segment.text, dedupedYoutube).catch(() => dedupedYoutube),
   ])
 
@@ -73,7 +74,7 @@ async function searchForSegment(
   const unscoredYoutube = transcriptEnriched.filter((v) => v.relevanceScore === undefined)
   const scoredYoutube = transcriptEnriched.filter((v) => v.relevanceScore !== undefined)
   const metadataFallback = unscoredYoutube.length > 0
-    ? await enrichWithMetadata(segment.text, unscoredYoutube).catch(() => unscoredYoutube)
+    ? await enrichWithMetadata(segment.text, unscoredYoutube, segment.topic).catch(() => unscoredYoutube)
     : []
   const enrichedYoutube = [...scoredYoutube, ...metadataFallback]
 
@@ -81,12 +82,50 @@ async function searchForSegment(
   const filterLowRelevance = (videos: VideoResult[]) =>
     videos.filter((v) => v.relevanceScore === undefined || v.relevanceScore >= 0.2)
 
-  // Combine all platforms and sort by relevance score descending
-  const combined = [
+  const filteredStock = [
     ...filterLowRelevance(enrichedPexels),
     ...filterLowRelevance(enrichedPixabay),
     ...filterLowRelevance(enrichedFreepik),
-    ...filterLowRelevance(enrichedYoutube),
+  ]
+  const filteredYoutube = filterLowRelevance(enrichedYoutube)
+
+  // Cascading fallback: if all stock results are poor quality, try simplified visual queries
+  const maxStockScore = Math.max(...filteredStock.map((v) => v.relevanceScore ?? 0), 0)
+  let finalStock = filteredStock
+
+  if (maxStockScore < 0.35 && allStock.length > 0) {
+    console.log(`[search] poor stock results (max score ${maxStockScore.toFixed(2)}) for "${segment.topic}" — running fallback queries`)
+    const fallbackQueries = await generateFallbackQueries(segment.text, segment.topic).catch(() => [] as string[])
+
+    if (fallbackQueries.length > 0) {
+      const fallbackPromises = fallbackQueries.flatMap((query) => [
+        searchPexels(query, 5).catch(() => [] as VideoResult[]),
+        searchPixabay(query, 5).catch(() => [] as VideoResult[]),
+        freepikApiKey
+          ? searchFreepik(query, freepikApiKey, 5).catch(() => [] as VideoResult[])
+          : Promise.resolve([] as VideoResult[]),
+      ])
+      const fallbackResults = await Promise.all(fallbackPromises)
+      const fallbackFlat = fallbackResults.flat()
+
+      // Exclude videos we already tried
+      const existingUrls = new Set(allStock.map((v) => v.sourceUrl))
+      const newVideos = deduplicateByUrl(fallbackFlat.filter((v) => !existingUrls.has(v.sourceUrl)))
+
+      if (newVideos.length > 0) {
+        const enrichedFallback = await enrichWithMetadata(segment.text, newVideos, segment.topic).catch(() => newVideos)
+        const filteredFallback = filterLowRelevance(enrichedFallback)
+        console.log(`[search] fallback found ${filteredFallback.length} usable new results for "${segment.topic}"`)
+        // Merge: put fallback results alongside original, then sort
+        finalStock = [...filteredStock, ...filteredFallback]
+      }
+    }
+  }
+
+  // Combine all platforms and sort by relevance score descending
+  const combined = [
+    ...finalStock,
+    ...filteredYoutube,
   ].sort((a, b) => (b.relevanceScore ?? -1) - (a.relevanceScore ?? -1))
 
   return {

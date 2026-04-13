@@ -14,7 +14,8 @@ interface ClaudeMatch {
 
 async function matchMetadataWithClaude(
   segmentText: string,
-  videos: VideoResult[]
+  videos: VideoResult[],
+  topic?: string
 ): Promise<ClaudeMatch[]> {
   if (videos.length === 0) return []
 
@@ -25,22 +26,30 @@ async function matchMetadataWithClaude(
     })
     .join('\n\n---\n\n')
 
+  const topicLine = topic ? `\nSEGMENT TOPIC: "${topic}"\n` : ''
+
   const prompt = `You are a video research assistant helping a content creator find B-roll stock footage.
 
 SCRIPT SEGMENT (what the creator is narrating):
-"${segmentText}"
+"${segmentText}"${topicLine}
 
-Below are stock footage clips from Pexels and Pixabay. Each clip is described by its title and tags — there is no transcript since these are silent stock clips.
+Below are stock footage clips. Each clip is described by its title and tags — there is no transcript since these are silent stock clips.
 
 For each clip, score how visually relevant it is to the script segment — meaning: would this footage work well as B-roll playing while the creator narrates those words?
 
-Score 1.0 = the clip would be a perfect visual match for this narration
-Score 0.0 = the clip has nothing to do with what's being described
+CRITICAL SCORING RULE — WRONG SPORT/ACTIVITY PENALTY:
+If the script segment describes a specific sport or physical activity (e.g. American football, basketball, soccer, rugby, swimming, boxing), and a clip clearly shows a DIFFERENT sport or activity, score it 0.1 or lower — no exceptions. Showing the wrong sport as B-roll is worse than having no footage at all. For example: if the segment is about American football but the video shows rugby players, score it ≤ 0.1.
+
+Score 1.0 = perfect visual match for this narration
+Score 0.7–0.9 = strong match — clearly shows the right activity/context
+Score 0.4–0.6 = partial match — related theme but not a great fit
+Score 0.1–0.3 = weak or misleading match
+Score 0.0–0.1 = wrong activity/sport, or completely unrelated
 
 Return ONLY a valid JSON array. No markdown, no explanation. Each object must have:
 - videoId (string)
 - relevanceScore (number, 0.0–1.0)
-- reason (string, 1 sentence max — explain what visual content makes it relevant or irrelevant)
+- reason (string, 1 sentence max — explain what visual content makes it relevant or irrelevant, and flag if it shows the WRONG sport/activity)
 
 ${videoDescriptions}`
 
@@ -68,13 +77,14 @@ ${videoDescriptions}`
 // Enriches Pexels/Pixabay results with Claude-scored relevance based on metadata
 export async function enrichWithMetadata(
   segmentText: string,
-  videos: VideoResult[]
+  videos: VideoResult[],
+  topic?: string
 ): Promise<VideoResult[]> {
   if (videos.length === 0) return []
 
   let matches: ClaudeMatch[] = []
   try {
-    matches = await matchMetadataWithClaude(segmentText, videos)
+    matches = await matchMetadataWithClaude(segmentText, videos, topic)
   } catch (err) {
     console.warn('Metadata enrichment failed, using raw results:', err)
     return videos
