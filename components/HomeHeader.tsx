@@ -21,7 +21,7 @@ export default function HomeHeader() {
         </div>
 
         {/* Right side */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-5">
           <Link
             href="/contact"
             className="text-sm text-gray-200 hover:text-white transition-colors"
