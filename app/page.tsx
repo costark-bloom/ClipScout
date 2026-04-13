@@ -28,8 +28,7 @@ export default function HomePage() {
           </h1>
 
           <p className="text-lg text-gray-400 max-w-xl text-balance text-center mx-auto">
-            Paste your script. AI identifies every visual moment. Instantly discover matching
-            footage from YouTube, Pexels, and Pixabay.
+            Paste your script. AI identifies every visual moment to discover matching b-roll footage from across the web.
           </p>
 
         </div>
