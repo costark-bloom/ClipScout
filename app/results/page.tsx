@@ -438,9 +438,9 @@ export default function ResultsPage() {
               </button>
               <Link
                 href="/contact"
-                className="hidden md:block text-xs text-gray-500 hover:text-gray-300 transition-colors"
+                className="hidden md:block text-xs text-gray-200 hover:text-white transition-colors"
               >
-                Feedback
+                Contact
               </Link>
               <UserMenu />
             </div>
