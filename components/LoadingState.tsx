@@ -32,7 +32,7 @@ export default function LoadingState({ stage, progress, segmentCount }: LoadingS
           </h2>
           <p className="text-sm text-gray-400 text-balance">
             {stage === 'analyzing'
-              ? 'Claude is identifying visual moments and generating search queries.'
+              ? 'AI is identifying visual moments and generating search queries.'
               : segmentCount
               ? `Searching YouTube, Pexels & Pixabay for ${segmentCount} segment${segmentCount !== 1 ? 's' : ''}…`
               : 'Searching YouTube, Pexels & Pixabay…'}

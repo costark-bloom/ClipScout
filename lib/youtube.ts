@@ -21,6 +21,7 @@ interface YouTubeVideoItem {
   id: string
   snippet: { description: string }
   contentDetails: { duration: string }
+  status: { license: 'youtube' | 'creativeCommon' }
 }
 
 interface YouTubeVideoResponse {
@@ -163,7 +164,7 @@ export async function searchYouTube(query: string, maxResults = 5): Promise<Vide
   try {
     const detailRes = await fetchWithKeyRotation((key) => {
       const detailParams = new URLSearchParams({
-        part: 'snippet,contentDetails',
+        part: 'snippet,contentDetails,status',
         id: videoIds,
         key,
       })
@@ -198,6 +199,9 @@ export async function searchYouTube(query: string, maxResults = 5): Promise<Vide
       startTimestamp = bestChapterTimestamp(chapters, query)
     }
 
+    const ytLicense = detail?.status?.license
+    const license = ytLicense === 'creativeCommon' ? 'creative-commons' as const : 'standard' as const
+
     return {
       id: `yt_${videoId}`,
       title: item.snippet.title,
@@ -205,6 +209,7 @@ export async function searchYouTube(query: string, maxResults = 5): Promise<Vide
       sourceUrl: `https://www.youtube.com/watch?v=${videoId}&t=${startTimestamp}s`,
       embedUrl: `https://www.youtube.com/embed/${videoId}`,
       platform: 'youtube' as const,
+      license,
       duration,
       durationSeconds,
       channelOrAuthor: item.snippet.channelTitle,

@@ -1,13 +1,23 @@
 'use client'
 
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import type { ScriptSegment } from '@/lib/types'
 import useAppStore from '@/store/useAppStore'
+
+interface SelectionPopover {
+  top: number
+  left: number
+  text: string
+  startIndex: number
+  endIndex: number
+}
 
 interface InteractiveScriptProps {
   script: string
   segments: ScriptSegment[]
   containerRef?: React.RefObject<HTMLDivElement | null>
+  onAddSegment?: (text: string, startIndex: number, endIndex: number) => void
 }
 
 export function scrollToSegment(segmentId: string) {
@@ -17,13 +27,31 @@ export function scrollToSegment(segmentId: string) {
   }
 }
 
+// Walk up DOM to find nearest ancestor with data-text-start.
+// Returns null if a data-segment-id is found first (selection over an existing segment).
+function findTextStart(node: Node, container: HTMLElement): number | null {
+  let el: Element | null =
+    node.nodeType === Node.TEXT_NODE ? node.parentElement : (node as Element)
+  while (el && el !== container) {
+    if ((el as HTMLElement).dataset.segmentId) return null
+    if ((el as HTMLElement).dataset.textStart !== undefined) {
+      return Number((el as HTMLElement).dataset.textStart)
+    }
+    el = el.parentElement
+  }
+  return null
+}
+
 export default function InteractiveScript({
   script,
   segments,
   containerRef,
+  onAddSegment,
 }: InteractiveScriptProps) {
   const { activeSegmentId, setActiveSegment } = useAppStore()
   const spanRefs = useRef<Record<string, HTMLSpanElement | null>>({})
+  const scriptRef = useRef<HTMLDivElement>(null)
+  const [popover, setPopover] = useState<SelectionPopover | null>(null)
 
   // Scroll the active script span into view when activeSegmentId changes externally
   useEffect(() => {
@@ -53,6 +81,108 @@ export default function InteractiveScript({
     [setActiveSegment]
   )
 
+  // Dismiss popover when clicking outside
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      const target = e.target as HTMLElement
+      if (!target.closest('[data-add-segment-popover]')) {
+        setPopover(null)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  // Dismiss popover on Escape
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setPopover(null)
+    }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [])
+
+  // Detect text selection in non-segment regions
+  const handleMouseUp = useCallback(() => {
+    if (!onAddSegment) return
+    const container = scriptRef.current
+    if (!container) return
+
+    const selection = window.getSelection()
+    if (!selection || selection.isCollapsed) {
+      setPopover(null)
+      return
+    }
+
+    const selectedText = selection.toString().trim()
+    if (selectedText.length < 3) {
+      setPopover(null)
+      return
+    }
+
+    const range = selection.getRangeAt(0)
+
+    // Bail if the selection is not inside this script container
+    if (!container.contains(range.commonAncestorContainer)) {
+      setPopover(null)
+      return
+    }
+
+    // Bail if selection contains or crosses any existing segment span
+    const fragment = range.cloneContents()
+    if (fragment.querySelector('[data-segment-id]')) {
+      setPopover(null)
+      return
+    }
+
+    // Determine character offsets using data-text-start attributes
+    const startTextStart = findTextStart(range.startContainer, container)
+    const endTextStart = findTextStart(range.endContainer, container)
+
+    if (startTextStart === null || endTextStart === null) {
+      setPopover(null)
+      return
+    }
+
+    const startIndex = startTextStart + range.startOffset
+    const endIndex = endTextStart + range.endOffset
+
+    if (endIndex <= startIndex) {
+      setPopover(null)
+      return
+    }
+
+    // Double-check: ensure range doesn't overlap any existing segment
+    const overlaps = segments.some(
+      (s) => !(endIndex <= s.startIndex || startIndex >= s.endIndex)
+    )
+    if (overlaps) {
+      setPopover(null)
+      return
+    }
+
+    // Position the popover above the selection
+    const rect = range.getBoundingClientRect()
+    setPopover({
+      top: rect.top - 44,
+      left: Math.max(8, rect.left + rect.width / 2 - 64),
+      text: selectedText,
+      startIndex,
+      endIndex,
+    })
+  }, [onAddSegment, segments])
+
+  const handleAddClick = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault()
+      if (!popover || !onAddSegment) return
+      onAddSegment(popover.text, popover.startIndex, popover.endIndex)
+      setPopover(null)
+      window.getSelection()?.removeAllRanges()
+    },
+    [popover, onAddSegment]
+  )
+
   // Build React nodes from script text + sorted segments
   const sortedSegments = [...segments].sort((a, b) => a.startIndex - b.startIndex)
 
@@ -65,15 +195,11 @@ export default function InteractiveScript({
     const { startIndex, endIndex, id } = segment
     const segmentChapter = segment.chapter ?? 1
 
-    // Guard against malformed indices
     if (startIndex < cursor || endIndex <= startIndex || endIndex > script.length) continue
 
-    // Plain text before this segment — split at last newline before a chapter break
     if (startIndex > cursor) {
       const plainText = script.slice(cursor, startIndex)
 
-      // If a new chapter is starting, try to split the plain text at the last newline
-      // so the chapter marker lands cleanly between paragraphs
       if (segmentChapter !== currentChapter && currentChapter !== 0) {
         const lastNewline = plainText.lastIndexOf('\n')
         const beforeBreak = lastNewline >= 0 ? plainText.slice(0, lastNewline + 1) : plainText
@@ -81,11 +207,12 @@ export default function InteractiveScript({
 
         if (beforeBreak) {
           nodes.push(
-            <span key={`plain-${cursor}`} className="text-gray-300">{beforeBreak}</span>
+            <span key={`plain-${cursor}`} data-text-start={cursor} className="text-gray-300">
+              {beforeBreak}
+            </span>
           )
         }
 
-        // Chapter marker
         nodes.push(
           <span
             key={`chapter-${segmentChapter}`}
@@ -104,16 +231,19 @@ export default function InteractiveScript({
 
         if (afterBreak) {
           nodes.push(
-            <span key={`plain-after-${cursor}`} className="text-gray-300">{afterBreak}</span>
+            <span key={`plain-after-${cursor}`} data-text-start={cursor + (lastNewline >= 0 ? lastNewline + 1 : 0)} className="text-gray-300">
+              {afterBreak}
+            </span>
           )
         }
       } else {
         nodes.push(
-          <span key={`plain-${cursor}`} className="text-gray-300">{plainText}</span>
+          <span key={`plain-${cursor}`} data-text-start={cursor} className="text-gray-300">
+            {plainText}
+          </span>
         )
       }
     } else if (segmentChapter !== currentChapter && currentChapter !== 0) {
-      // Chapter changes right at segment boundary (no plain text gap)
       nodes.push(
         <span
           key={`chapter-${segmentChapter}`}
@@ -167,18 +297,45 @@ export default function InteractiveScript({
     cursor = endIndex
   }
 
-  // Remaining plain text after last segment
   if (cursor < script.length) {
     nodes.push(
-      <span key="plain-end" className="text-gray-300">
+      <span key="plain-end" data-text-start={cursor} className="text-gray-300">
         {script.slice(cursor)}
       </span>
     )
   }
 
   return (
-    <div className="text-sm leading-7 whitespace-pre-wrap font-serif selection:bg-indigo-900/50">
-      {nodes}
-    </div>
+    <>
+      <div
+        ref={scriptRef}
+        onMouseUp={handleMouseUp}
+        className="text-sm leading-7 whitespace-pre-wrap font-serif selection:bg-indigo-900/50"
+      >
+        {nodes}
+      </div>
+
+      {/* Floating "Add segment" popover — rendered in body to escape scroll containers */}
+      {popover && typeof window !== 'undefined' && createPortal(
+        <div
+          data-add-segment-popover
+          style={{ top: popover.top, left: popover.left }}
+          className="fixed z-50 pointer-events-auto"
+        >
+          <button
+            onMouseDown={handleAddClick}
+            className="bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white text-xs font-semibold px-3 py-1.5 rounded-full shadow-xl shadow-indigo-950/60 flex items-center gap-1.5 whitespace-nowrap transition-colors border border-indigo-400/20"
+          >
+            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+            </svg>
+            Add segment
+          </button>
+          {/* Arrow */}
+          <div className="absolute left-1/2 -translate-x-1/2 -bottom-1.5 w-3 h-3 bg-indigo-600 rotate-45 border-r border-b border-indigo-400/20" />
+        </div>,
+        document.body
+      )}
+    </>
   )
 }

@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import Image from 'next/image'
 import type { VideoResult } from '@/lib/types'
+import { getReuseScore, TIER_COLORS } from '@/lib/reuse-score'
 import VideoPreview from './VideoPreview'
 
 interface VideoCardProps {
@@ -28,13 +29,22 @@ const PLATFORM_CONFIG = {
     textColor: 'text-blue-400',
     borderColor: 'border-blue-800/50',
   },
+  freepik: {
+    label: 'Freepik',
+    color: 'bg-[#1273EB]',
+    textColor: 'text-[#4da3ff]',
+    borderColor: 'border-blue-800/50',
+  },
 }
 
 export default function VideoCard({ video }: VideoCardProps) {
   const [showPreview, setShowPreview] = useState(false)
   const [imgError, setImgError] = useState(false)
+  const [showScoreDetail, setShowScoreDetail] = useState(false)
 
   const config = PLATFORM_CONFIG[video.platform]
+  const reuseScore = getReuseScore(video)
+  const scoreColors = TIER_COLORS[reuseScore.tier]
 
   return (
     <>
@@ -94,6 +104,30 @@ export default function VideoCard({ video }: VideoCardProps) {
           {video.channelOrAuthor && (
             <p className={`text-[10px] truncate ${config.textColor}`}>{video.channelOrAuthor}</p>
           )}
+
+          {/* Reuse Score */}
+          <div className="relative">
+            <button
+              onClick={() => setShowScoreDetail((v) => !v)}
+              className={`flex items-center gap-1.5 w-full rounded-md px-2 py-1 border ${scoreColors.bg} ${scoreColors.border} hover:opacity-80 transition-opacity`}
+            >
+              <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${scoreColors.dot}`} />
+              <span className={`text-[9px] font-semibold uppercase tracking-wider ${scoreColors.text}`}>
+                {reuseScore.label}
+              </span>
+              <span className={`ml-auto text-[9px] font-bold ${scoreColors.text}`}>
+                {reuseScore.score}%
+              </span>
+            </button>
+            {showScoreDetail && (
+              <div className="absolute bottom-full left-0 right-0 mb-1.5 z-10 bg-gray-800 border border-gray-700 rounded-lg p-2.5 shadow-xl">
+                <p className={`text-[9px] font-bold uppercase tracking-wider mb-1 ${scoreColors.text}`}>
+                  Safe Use Score: {reuseScore.score}%
+                </p>
+                <p className="text-[10px] text-gray-300 leading-relaxed">{reuseScore.detail}</p>
+              </div>
+            )}
+          </div>
 
           {/* Transcript-based relevance info */}
           {video.transcriptReason && (

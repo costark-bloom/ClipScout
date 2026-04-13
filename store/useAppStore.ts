@@ -46,6 +46,11 @@ const useAppStore = create<AppStateWithHydration>()(
           chapterStatus: { ...state.chapterStatus, [chapter]: status },
         })),
 
+      updateSegment: (id, updates) =>
+        set((state) => ({
+          segments: state.segments.map((s) => (s.id === id ? { ...s, ...updates } : s)),
+        })),
+
       setError: (error: string | null) => set({ error }),
 
       reset: () =>

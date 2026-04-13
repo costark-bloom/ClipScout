@@ -73,6 +73,7 @@ export async function searchPixabay(query: string, perPage = 5): Promise<VideoRe
       sourceUrl: hit.pageURL,
       embedUrl,
       platform: 'pixabay' as const,
+      license: 'royalty-free' as const,
       duration,
       durationSeconds: hit.duration,
       channelOrAuthor: hit.user,

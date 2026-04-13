@@ -66,6 +66,7 @@ export async function searchPexels(query: string, perPage = 5): Promise<VideoRes
       sourceUrl: video.url,
       embedUrl: `https://www.pexels.com/video/${video.id}/player/`,
       platform: 'pexels' as const,
+      license: 'royalty-free' as const,
       duration,
       durationSeconds: video.duration,
       channelOrAuthor: video.user.name,

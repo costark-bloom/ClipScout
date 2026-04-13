@@ -10,6 +10,10 @@ export const metadata: Metadata = {
   description:
     'Paste your script, let AI identify visual moments, and discover relevant B-roll footage from YouTube, Pexels, and Pixabay.',
   keywords: ['b-roll', 'video footage', 'content creator', 'AI', 'script analysis', 'clipscout'],
+  icons: {
+    icon: '/icon.svg',
+    shortcut: '/icon.svg',
+  },
   openGraph: {
     title: 'ClipScout',
     description: 'AI-powered B-roll footage discovery for content creators.',

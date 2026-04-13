@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/app/api/auth/[...nextauth]/route'
 import { searchYouTube } from '@/lib/youtube'
 import { searchPexels } from '@/lib/pexels'
 import { searchPixabay } from '@/lib/pixabay'
+import { searchFreepik } from '@/lib/freepik'
 import { enrichWithTranscripts } from '@/lib/transcript-matcher'
 import { enrichWithMetadata } from '@/lib/metadata-matcher'
+import { supabase } from '@/lib/supabase'
 import type { ScriptSegment, SearchResults, VideoResult } from '@/lib/types'
 
 const MAX_PER_SOURCE = 4
@@ -18,7 +22,10 @@ function deduplicateByUrl(videos: VideoResult[]): VideoResult[] {
   })
 }
 
-async function searchForSegment(segment: ScriptSegment): Promise<SearchResults> {
+async function searchForSegment(
+  segment: ScriptSegment,
+  freepikApiKey?: string
+): Promise<SearchResults> {
   const queries = segment.searchQueries.slice(0, 3)
 
   // Run all queries across all platforms concurrently
@@ -26,6 +33,9 @@ async function searchForSegment(segment: ScriptSegment): Promise<SearchResults> 
     searchPexels(query, 5).catch(() => [] as VideoResult[]),
     searchPixabay(query, 5).catch(() => [] as VideoResult[]),
     searchYouTube(query, 5).catch(() => [] as VideoResult[]),
+    freepikApiKey
+      ? searchFreepik(query, freepikApiKey, 5).catch(() => [] as VideoResult[])
+      : Promise.resolve([] as VideoResult[]),
   ])
 
   const allResults = await Promise.all(allPromises)
@@ -33,20 +43,23 @@ async function searchForSegment(segment: ScriptSegment): Promise<SearchResults> 
   const pexelsResults: VideoResult[] = []
   const pixabayResults: VideoResult[] = []
   const youtubeResults: VideoResult[] = []
+  const freepikResults: VideoResult[] = []
 
   allResults.forEach((results, idx) => {
-    const platformIdx = idx % 3
+    const platformIdx = idx % 4
     if (platformIdx === 0) pexelsResults.push(...results)
     else if (platformIdx === 1) pixabayResults.push(...results)
-    else youtubeResults.push(...results)
+    else if (platformIdx === 2) youtubeResults.push(...results)
+    else freepikResults.push(...results)
   })
 
   const dedupedPexels = deduplicateByUrl(pexelsResults).slice(0, MAX_PER_SOURCE)
   const dedupedPixabay = deduplicateByUrl(pixabayResults).slice(0, MAX_PER_SOURCE)
   const dedupedYoutube = deduplicateByUrl(youtubeResults).slice(0, MAX_PER_SOURCE)
+  const dedupedFreepik = deduplicateByUrl(freepikResults).slice(0, MAX_PER_SOURCE)
 
-  // Combine Pexels + Pixabay into one Claude call, run alongside transcript enrichment
-  const allStock = [...dedupedPexels, ...dedupedPixabay]
+  // Enrich all stock sources (Pexels + Pixabay + Freepik) in one Claude call
+  const allStock = [...dedupedPexels, ...dedupedPixabay, ...dedupedFreepik]
   const [enrichedStock, transcriptEnriched] = await Promise.all([
     enrichWithMetadata(segment.text, allStock).catch(() => allStock),
     enrichWithTranscripts(segment.text, dedupedYoutube).catch(() => dedupedYoutube),
@@ -54,6 +67,7 @@ async function searchForSegment(segment: ScriptSegment): Promise<SearchResults> 
 
   const enrichedPexels = enrichedStock.filter((v) => v.platform === 'pexels')
   const enrichedPixabay = enrichedStock.filter((v) => v.platform === 'pixabay')
+  const enrichedFreepik = enrichedStock.filter((v) => v.platform === 'freepik')
 
   // Fall back to metadata scoring for any YouTube videos that didn't get transcript scores
   const unscoredYoutube = transcriptEnriched.filter((v) => v.relevanceScore === undefined)
@@ -68,10 +82,10 @@ async function searchForSegment(segment: ScriptSegment): Promise<SearchResults> 
     videos.filter((v) => v.relevanceScore === undefined || v.relevanceScore >= 0.2)
 
   // Combine all platforms and sort by relevance score descending
-  // Videos without a score (enrichment failed) go to the end
   const combined = [
     ...filterLowRelevance(enrichedPexels),
     ...filterLowRelevance(enrichedPixabay),
+    ...filterLowRelevance(enrichedFreepik),
     ...filterLowRelevance(enrichedYoutube),
   ].sort((a, b) => (b.relevanceScore ?? -1) - (a.relevanceScore ?? -1))
 
@@ -111,11 +125,30 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ results: [] })
     }
 
+    // Look up user's Freepik key if they're signed in
+    let freepikApiKey: string | undefined
+    try {
+      const session = await getServerSession(authOptions)
+      if (session?.user?.email) {
+        const { data } = await supabase
+          .from('user_settings')
+          .select('freepik_api_key')
+          .eq('user_email', session.user.email)
+          .single()
+        freepikApiKey = data?.freepik_api_key ?? undefined
+        if (freepikApiKey) {
+          console.log('[search] Freepik key found — including Freepik results')
+        }
+      }
+    } catch {
+      // Non-fatal — proceed without Freepik
+    }
+
     // Process max 2 segments concurrently to avoid overwhelming Claude API
     const results = await withConcurrencyLimit(
       segments as ScriptSegment[],
       2,
-      searchForSegment
+      (segment) => searchForSegment(segment, freepikApiKey)
     )
 
     return NextResponse.json({ results })

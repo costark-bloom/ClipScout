@@ -12,12 +12,14 @@ const PLATFORM_COLORS = {
   youtube: 'bg-red-600',
   pexels: 'bg-green-600',
   pixabay: 'bg-blue-600',
+  freepik: 'bg-[#1273EB]',
 }
 
 const PLATFORM_LABELS = {
   youtube: 'YouTube',
   pexels: 'Pexels',
   pixabay: 'Pixabay',
+  freepik: 'Freepik',
 }
 
 export default function VideoPreview({ video, onClose }: VideoPreviewProps) {
@@ -89,7 +91,7 @@ export default function VideoPreview({ video, onClose }: VideoPreviewProps) {
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
               allowFullScreen
             />
-          ) : video.platform === 'pixabay' && video.embedUrl ? (
+          ) : (video.platform === 'pixabay' || video.platform === 'freepik') && video.embedUrl ? (
             <video
               src={`${video.embedUrl}#t=${video.startTimestamp ?? 0}`}
               className="w-full h-full object-contain"
@@ -98,6 +100,24 @@ export default function VideoPreview({ video, onClose }: VideoPreviewProps) {
               muted
               playsInline
             />
+          ) : (video.platform === 'freepik' && !video.embedUrl) ? (
+            <div className="w-full h-full flex flex-col items-center justify-center gap-4 text-gray-500 px-6">
+              <svg className="w-12 h-12 opacity-30" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="m15.75 10.5 4.72-4.72a.75.75 0 0 1 1.28.53v11.38a.75.75 0 0 1-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 0 0 2.25-2.25v-9a2.25 2.25 0 0 0-2.25-2.25h-9A2.25 2.25 0 0 0 2.25 7.5v9a2.25 2.25 0 0 0 2.25 2.25Z" />
+              </svg>
+              <div className="text-center">
+                <p className="text-sm font-medium text-gray-400">In-browser preview not available</p>
+                <p className="text-xs text-gray-600 mt-1">View the full video on Freepik</p>
+              </div>
+              <a
+                href={video.sourceUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="bg-[#1273EB] hover:bg-[#0f5fd4] text-white text-sm font-medium px-4 py-2 rounded-xl transition-colors"
+              >
+                Open on Freepik →
+              </a>
+            </div>
           ) : (
             <div className="w-full h-full flex items-center justify-center text-gray-600">
               <p className="text-sm">Preview not available — view the original source</p>

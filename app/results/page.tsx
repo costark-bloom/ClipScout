@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import useAppStore from '@/store/useAppStore'
 import InteractiveScript from '@/components/InteractiveScript'
@@ -30,8 +31,12 @@ export default function ResultsPage() {
     setActiveSegment,
     setChapterStatus,
     addSearchResults,
+    addSegments,
+    updateSegment,
     reset,
   } = useAppStore()
+
+  const [loadingSegmentIds, setLoadingSegmentIds] = useState<Set<string>>(new Set())
 
   const scriptPanelRef = useRef<HTMLDivElement>(null)
   const [visibleChapters, setVisibleChapters] = useState<number[]>([])
@@ -184,6 +189,73 @@ export default function ResultsPage() {
     }
   }
 
+  const handleAddSegment = useCallback(
+    async (text: string, startIndex: number, endIndex: number) => {
+      const id = `manual_${Date.now()}`
+
+      // Determine which chapter this position belongs to
+      const chapter = [...segments]
+        .filter((s) => s.startIndex <= startIndex)
+        .sort((a, b) => b.startIndex - a.startIndex)[0]?.chapter ?? 1
+
+      const placeholder: ScriptSegment = {
+        id,
+        text,
+        topic: 'Analyzing…',
+        searchQueries: [text.slice(0, 80)],
+        startIndex,
+        endIndex,
+        chapter,
+      }
+
+      addSegments([placeholder])
+      setLoadingSegmentIds((prev) => new Set([...prev, id]))
+
+      // Scroll to the new card once it mounts
+      setTimeout(() => {
+        document.getElementById(`segment-card-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }, 150)
+
+      let topic = text.slice(0, 60)
+      let searchQueries = [text.slice(0, 80)]
+
+      try {
+        // 1. Get AI-generated topic + search queries
+        const analyzeRes = await fetch('/api/analyze-segment', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text }),
+        })
+        if (analyzeRes.ok) {
+          const data = await analyzeRes.json()
+          topic = data.topic ?? topic
+          searchQueries = data.searchQueries ?? searchQueries
+          updateSegment(id, { topic, searchQueries })
+        }
+
+        // 2. Search for videos
+        const searchRes = await fetch('/api/search', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            segments: [{ ...placeholder, topic, searchQueries }],
+          }),
+        })
+        if (searchRes.ok) {
+          const { results } = await searchRes.json()
+          addSearchResults(results)
+        }
+      } finally {
+        setLoadingSegmentIds((prev) => {
+          const next = new Set(prev)
+          next.delete(id)
+          return next
+        })
+      }
+    },
+    [segments, addSegments, updateSegment, addSearchResults]
+  )
+
   const handleSegmentIntersect = useCallback(
     (segmentId: string) => setActiveSegment(segmentId),
     [setActiveSegment]
@@ -267,7 +339,12 @@ export default function ResultsPage() {
 
           <div ref={scriptPanelRef} className="flex-1 overflow-y-auto px-5 py-4">
             {script ? (
-              <InteractiveScript script={script} segments={segments} containerRef={scriptPanelRef} />
+              <InteractiveScript
+                script={script}
+                segments={segments}
+                containerRef={scriptPanelRef}
+                onAddSegment={handleAddSegment}
+              />
             ) : (
               <div className="space-y-2">
                 {[...Array(8)].map((_, i) => (
@@ -278,10 +355,13 @@ export default function ResultsPage() {
           </div>
 
           {segments.length > 0 && (
-            <div className="px-5 py-3 border-t border-gray-800 shrink-0">
+            <div className="px-5 py-3 border-t border-gray-800 shrink-0 space-y-1.5">
               <p className="text-[10px] text-gray-700 leading-relaxed">
                 <span className="inline-block border-b-2 border-indigo-600/50 text-gray-500 mr-1">Underlined text</span>
                 = B-roll segment. Click to jump to clips.
+              </p>
+              <p className="text-[10px] text-gray-700 leading-relaxed">
+                Highlight any other text to add a custom segment.
               </p>
             </div>
           )}
@@ -309,7 +389,7 @@ export default function ResultsPage() {
                 </p>
                 {isLoading && (
                   <p className="text-[10px] text-gray-600">
-                    {isAnalyzing ? 'Claude is reading your script…' : 'Searching YouTube, Pexels & Pixabay…'}
+                    {isAnalyzing ? 'AI is reading your script…' : 'Searching YouTube, Pexels & Pixabay…'}
                   </p>
                 )}
               </div>
@@ -355,6 +435,12 @@ export default function ResultsPage() {
                 </svg>
                 Start over
               </button>
+              <Link
+                href="/contact"
+                className="hidden md:block text-xs text-gray-500 hover:text-gray-300 transition-colors"
+              >
+                Feedback
+              </Link>
               <UserMenu />
             </div>
           </div>
@@ -397,11 +483,12 @@ export default function ResultsPage() {
                     {/* Chapter content */}
                     {isVisible && (status === 'loading' || status === 'done' || status === 'idle') ? (
                       <div className="space-y-5">
-                        {chapterSegments.map((segment, i) => {
+                        {chapterSegments.map((segment) => {
                           const segIndex = segments.findIndex(s => s.id === segment.id)
                           const result = searchResults.find((r) => r.segmentId === segment.id)
+                          const isManualLoading = loadingSegmentIds.has(segment.id)
 
-                          return status === 'loading' && !result ? (
+                          return (status === 'loading' && !result) || isManualLoading ? (
                             // Per-segment skeleton while loading
                             <div key={segment.id} className="rounded-2xl border border-gray-800 bg-gray-900/50 p-5 space-y-3 animate-pulse">
                               <div className="flex items-center gap-3">

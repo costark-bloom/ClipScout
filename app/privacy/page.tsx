@@ -175,7 +175,7 @@ export default function PrivacyPage() {
               </div>
               <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
                 <p className="font-medium text-gray-200 text-sm mb-1">Anthropic</p>
-                <p className="text-xs text-gray-500 mb-2">AI analysis of your script content via the Claude API. Script text is sent to Anthropic&apos;s servers for processing.</p>
+                <p className="text-xs text-gray-500 mb-2">AI analysis of your script content. Script text is sent to our AI provider&apos;s servers for processing.</p>
                 <a href="https://www.anthropic.com/privacy" target="_blank" rel="noopener noreferrer" className="text-xs text-indigo-400 hover:text-indigo-300">anthropic.com/privacy →</a>
               </div>
               <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
