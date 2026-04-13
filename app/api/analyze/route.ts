@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { splitIntoChunks, analyzeChunk, validateSegments } from '@/lib/claude'
+import { splitIntoChunks, analyzeChunk, validateSegments, generateScriptContext } from '@/lib/claude'
 import type { ScriptSegment } from '@/lib/types'
 
 export const maxDuration = 60
@@ -30,8 +30,13 @@ export async function POST(request: NextRequest) {
   const stream = new ReadableStream({
     async start(controller) {
       try {
+        // Generate script context summary before analyzing any chunks.
+        // This fast Haiku call (~1s) gives every chunk specific topic/location/event context.
+        const scriptContext = await generateScriptContext(trimmed)
+
         const processChunk = async (chunk: { text: string; offset: number }, index: number) => {
-          const raw = await analyzeChunk(chunk.text, chunk.offset, index + 1, index + 1)
+          const contextBefore = trimmed.slice(Math.max(0, chunk.offset - 400), chunk.offset)
+          const raw = await analyzeChunk(chunk.text, chunk.offset, index + 1, index + 1, scriptContext, contextBefore)
           const validated = validateSegments(trimmed, raw).map((seg) => ({
             ...seg,
             id: `seg_${++segmentCounter}`,

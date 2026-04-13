@@ -18,13 +18,23 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'text is required' }, { status: 400 })
     }
 
-    const prompt = `You are a video research assistant. Given this script excerpt, return a JSON object with:
+    const scriptContext = typeof body?.scriptContext === 'string' ? body.scriptContext : ''
+    const surroundingText = typeof body?.surroundingText === 'string' ? body.surroundingText : ''
+
+    const contextLine = scriptContext
+      ? `Script context: ${scriptContext}\n\n`
+      : ''
+    const surroundingLine = surroundingText
+      ? `Surrounding script text: ${surroundingText}\n\n`
+      : ''
+
+    const prompt = `You are a video research assistant. Given this script excerpt (plus context), return a JSON object with:
 - "topic": a short (3-6 word) visual topic label describing what footage would illustrate this
-- "searchQueries": an array of 2-3 optimized search queries for finding relevant B-roll footage
+- "searchQueries": an array of 2-3 search queries that are SPECIFIC — include the script's topic, event name, location, or key proper nouns from the context above. Never write generic queries.
 
 Return ONLY valid JSON, no markdown, no explanation.
 
-Script excerpt:
+${contextLine}${surroundingLine}Script excerpt:
 "${text.slice(0, 500)}"`
 
     const message = await client.messages.create({

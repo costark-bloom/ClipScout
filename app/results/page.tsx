@@ -220,11 +220,12 @@ export default function ResultsPage() {
       let searchQueries = [text.slice(0, 80)]
 
       try {
-        // 1. Get AI-generated topic + search queries
+        // 1. Get AI-generated topic + search queries (pass surrounding script text for context)
+        const surroundingText = script.slice(Math.max(0, startIndex - 300), endIndex + 300)
         const analyzeRes = await fetch('/api/analyze-segment', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text }),
+          body: JSON.stringify({ text, surroundingText }),
         })
         if (analyzeRes.ok) {
           const data = await analyzeRes.json()

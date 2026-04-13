@@ -6,7 +6,15 @@ const client = new Anthropic({
   maxRetries: 3,
 })
 
-const SYSTEM_PROMPT = `You are a video research assistant. Your job is to analyze a video script and identify every phrase, sentence, or clause that describes something visually specific — a moment where B-roll footage would help illustrate what's being said. For each segment, return the exact verbatim text from the script (no paraphrasing), the character start and end indices of that text within the full script, a short visual topic label, and 2-3 optimized search queries. Return only valid JSON — no markdown, no explanation, no preamble. Return an array of segment objects. Segments must not overlap. Every meaningful visual moment should be covered but generic transitions or filler phrases should be skipped.`
+const SYSTEM_PROMPT = `You are a video research assistant. Your job is to analyze a video script and identify every phrase, sentence, or clause that describes something visually specific — a moment where B-roll footage would help illustrate what's being said.
+
+For each segment:
+- Return the exact verbatim text from the script (no paraphrasing)
+- Return the character start and end indices within the excerpt
+- Write a short visual topic label
+- Write 2-3 search queries that are SPECIFIC and CONTEXTUAL — always incorporate the script's topic, location, event name, or key proper nouns into the queries. Never write generic queries that could apply to any script. For example, if the script is about the Redbox Bowl at AT&T Park, a query for "crowded sideline" should be "Redbox Bowl crowded sideline AT&T Park" not just "crowded football sideline".
+
+Return only valid JSON — no markdown, no explanation, no preamble. Return an array of segment objects. Segments must not overlap. Every meaningful visual moment should be covered but generic transitions or filler phrases should be skipped.`
 
 const WORDS_PER_CHUNK = 400
 
@@ -101,13 +109,43 @@ export function validateSegments(script: string, segments: ScriptSegment[]): Scr
   return validated
 }
 
+// Generate a brief context summary of the full script using a fast Haiku call.
+// This anchors every chunk's search queries to the script's topic/event/location.
+export async function generateScriptContext(script: string): Promise<string> {
+  try {
+    const message = await client.messages.create({
+      model: 'claude-haiku-4-5',
+      max_tokens: 150,
+      messages: [{
+        role: 'user',
+        content: `In 1-2 sentences, summarize what this script is about for a video researcher — include the specific topic, event name, location, people, or organization if mentioned. Be specific, not generic.\n\nScript:\n${script.slice(0, 2000)}`,
+      }],
+    })
+    const text = message.content[0].type === 'text' ? message.content[0].text.trim() : ''
+    console.log(`[claude] script context: ${text}`)
+    return text
+  } catch {
+    return '' // non-fatal — analysis continues without context
+  }
+}
+
 export async function analyzeChunk(
   chunkText: string,
   offset: number,
   chapterNumber: number,
-  chunkIndex: number
+  chunkIndex: number,
+  scriptContext?: string,
+  contextBefore?: string
 ): Promise<ScriptSegment[]> {
-  const userMessage = `Analyze this script excerpt and return a JSON array of segments. Each object must have: id (string, e.g. seg_${chunkIndex}_1), text (exact verbatim phrase from the excerpt), startIndex (number — character index within this excerpt), endIndex (number), topic (short visual label), searchQueries (array of 2-3 strings), chapter (use ${chapterNumber} for all segments in this response). Return only valid JSON with no markdown or explanation.\n\nExcerpt:\n${chunkText}`
+  const contextSection = scriptContext
+    ? `SCRIPT CONTEXT (use this to make search queries specific):\n${scriptContext}\n\n`
+    : ''
+
+  const precedingSection = contextBefore?.trim()
+    ? `PRECEDING NARRATIVE (for context — do not extract segments from this):\n${contextBefore.trim()}\n\n`
+    : ''
+
+  const userMessage = `${contextSection}${precedingSection}Analyze the CURRENT EXCERPT below and return a JSON array of segments. Each object must have: id (string, e.g. seg_${chunkIndex}_1), text (exact verbatim phrase from the excerpt), startIndex (number — character index within this excerpt), endIndex (number), topic (short visual label), searchQueries (array of 2-3 strings — must be specific to the script's topic/event/location using the context above), chapter (use ${chapterNumber} for all segments in this response). Return only valid JSON with no markdown or explanation.\n\nCURRENT EXCERPT:\n${chunkText}`
 
   const message = await client.messages.create({
     model: 'claude-sonnet-4-5',
@@ -136,9 +174,14 @@ export async function analyzeScript(script: string): Promise<ScriptSegment[]> {
   const chunks = splitIntoChunks(script)
   console.log(`[claude] split script into ${chunks.length} chunk(s)`)
 
-  // Analyze all chunks in parallel
+  // Generate context summary first (fast Haiku call ~1s), then run all chunks with it
+  const scriptContext = await generateScriptContext(script)
+
   const chunkResults = await Promise.all(
-    chunks.map((chunk, i) => analyzeChunk(chunk.text, chunk.offset, i + 1, i + 1))
+    chunks.map((chunk, i) => {
+      const contextBefore = script.slice(Math.max(0, chunk.offset - 400), chunk.offset)
+      return analyzeChunk(chunk.text, chunk.offset, i + 1, i + 1, scriptContext, contextBefore)
+    })
   )
 
   // Flatten, re-ID, and validate against the full script
