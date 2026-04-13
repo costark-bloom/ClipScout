@@ -57,6 +57,12 @@ export async function searchPexels(query: string, perPage = 5): Promise<VideoRes
       ? slugMatch[1].split('-').filter((w: string) => w.length > 2)
       : []
 
+    // Use direct MP4 file URL for preview — the Pexels iframe player blocks cross-origin embedding
+    const hdFile = video.video_files.find((f) => f.quality === 'hd' && f.file_type === 'video/mp4')
+    const sdFile = video.video_files.find((f) => f.quality === 'sd' && f.file_type === 'video/mp4')
+    const anyFile = video.video_files.find((f) => f.file_type === 'video/mp4') ?? video.video_files[0]
+    const embedUrl = (hdFile ?? sdFile ?? anyFile)?.link
+
     return {
       id: `px_${video.id}`,
       title: tags.length > 0
@@ -64,7 +70,7 @@ export async function searchPexels(query: string, perPage = 5): Promise<VideoRes
         : `Pexels Video #${video.id}`,
       thumbnailUrl: video.image,
       sourceUrl: video.url,
-      embedUrl: `https://www.pexels.com/video/${video.id}/player/`,
+      embedUrl,
       platform: 'pexels' as const,
       license: 'royalty-free' as const,
       duration,

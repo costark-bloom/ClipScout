@@ -51,8 +51,7 @@ export async function searchPixabay(query: string, perPage = 5): Promise<VideoRe
       hit.videos.small?.url ||
       hit.videos.tiny?.url
 
-    // Pixabay CDN thumbnail — fall back to a generic placeholder handled in VideoCard
-    const thumbnailUrl = `https://cdn.pixabay.com/vimeo/${hit.picture_id}__640.jpg`
+    const thumbnailUrl = `https://i.vimeocdn.com/video/${hit.picture_id}_640x360.jpg`
 
     const minutes = Math.floor(hit.duration / 60)
     const seconds = hit.duration % 60

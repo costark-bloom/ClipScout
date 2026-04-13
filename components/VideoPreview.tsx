@@ -80,18 +80,14 @@ export default function VideoPreview({ video, onClose }: VideoPreviewProps) {
 
         {/* Video player */}
         <div className="relative aspect-video bg-black">
-          {(video.platform === 'youtube' || video.platform === 'pexels') && video.embedUrl ? (
+          {video.platform === 'youtube' && video.embedUrl ? (
             <iframe
-              src={
-                video.platform === 'youtube'
-                  ? `${video.embedUrl}?autoplay=1&mute=1&rel=0&modestbranding=1&start=${video.startTimestamp ?? 0}`
-                  : `${video.embedUrl}?autoplay=1&muted=1`
-              }
+              src={`${video.embedUrl}?autoplay=1&mute=1&rel=0&modestbranding=1&start=${video.startTimestamp ?? 0}`}
               className="w-full h-full"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
               allowFullScreen
             />
-          ) : (video.platform === 'pixabay' || video.platform === 'freepik') && video.embedUrl ? (
+          ) : (video.platform === 'pexels' || video.platform === 'pixabay' || video.platform === 'freepik') && video.embedUrl ? (
             <video
               src={`${video.embedUrl}#t=${video.startTimestamp ?? 0}`}
               className="w-full h-full object-contain"
