@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import Script from 'next/script'
 import './globals.css'
 import SessionProvider from '@/components/SessionProvider'
+import Footer from '@/components/Footer'
 
 export const metadata: Metadata = {
   title: 'ClipScout — AI-Powered Video Discovery',
@@ -22,8 +23,11 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className="dark">
-      <body className="min-h-screen bg-gray-950">
-        <SessionProvider>{children}</SessionProvider>
+      <body className="min-h-screen bg-gray-950 flex flex-col">
+        <SessionProvider>
+          <div className="flex-1">{children}</div>
+          <Footer />
+        </SessionProvider>
         <Script
           id="mixpanel-init"
           strategy="afterInteractive"

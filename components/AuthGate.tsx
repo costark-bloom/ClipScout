@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { signIn, useSession } from 'next-auth/react'
 
 interface AuthGateProps {
@@ -189,6 +190,19 @@ export default function AuthGate({ onAuthenticated }: AuthGateProps) {
               </p>
             )}
           </div>
+
+          {/* Legal links */}
+          <p className="mt-4 text-center text-[10px] text-gray-700 leading-relaxed">
+            By continuing, you agree to our{' '}
+            <Link href="/terms" target="_blank" className="text-gray-600 hover:text-gray-400 underline underline-offset-2 transition-colors">
+              Terms of Use
+            </Link>{' '}
+            and{' '}
+            <Link href="/privacy" target="_blank" className="text-gray-600 hover:text-gray-400 underline underline-offset-2 transition-colors">
+              Privacy Policy
+            </Link>
+            .
+          </p>
         </div>
       </div>
     </div>
