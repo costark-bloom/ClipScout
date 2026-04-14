@@ -69,7 +69,7 @@ export async function POST(req: NextRequest) {
           'active',
           session.customer as string,
           sub.id,
-          sub.current_period_end,
+          (sub as any).current_period_end ?? null,
         )
         await grantSubscriptionCredits(userEmail, planId)
         console.log(`[webhook] subscription activated for ${userEmail} (${planId}/${interval})`)
@@ -90,7 +90,7 @@ export async function POST(req: NextRequest) {
           sub.status,
           sub.customer as string,
           sub.id,
-          sub.current_period_end,
+          (sub as any).current_period_end ?? null,
         )
         console.log(`[webhook] subscription updated for ${userEmail}: ${sub.status}`)
         break

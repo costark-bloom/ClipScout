@@ -74,8 +74,8 @@ export async function POST(req: NextRequest) {
         subscription_status: 'active',
         stripe_customer_id: checkoutSession.customer as string,
         stripe_subscription_id: sub.id,
-        subscription_period_end: sub.current_period_end
-          ? new Date(sub.current_period_end * 1000).toISOString()
+        subscription_period_end: (sub as any).current_period_end
+          ? new Date((sub as any).current_period_end * 1000).toISOString()
           : null,
         credits_remaining: PLAN_CREDITS[planId] ?? 0,
         credits_used: 0,
