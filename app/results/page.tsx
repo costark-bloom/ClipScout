@@ -10,6 +10,7 @@ import LoadingState from '@/components/LoadingState'
 import DisclaimerBanner from '@/components/DisclaimerBanner'
 import AuthGate, { useAuthGate } from '@/components/AuthGate'
 import UserMenu from '@/components/UserMenu'
+import UpgradeModal from '@/components/UpgradeModal'
 import type { ScriptSegment } from '@/lib/types'
 
 // Returns sorted unique chapter numbers from segments
@@ -27,6 +28,8 @@ export default function ResultsPage() {
     isAnalyzing,
     chapterStatus,
     error,
+    showUpgradeModal,
+    setShowUpgradeModal,
     _hasHydrated,
     setActiveSegment,
     setChapterStatus,
@@ -34,11 +37,21 @@ export default function ResultsPage() {
     addSegments,
     updateSegment,
     reset,
+    scriptChunkOffsets,
+    scriptChunkCount,
+    savedScriptContext,
+    setSavedScriptContext,
   } = useAppStore()
 
   const [loadingSegmentIds, setLoadingSegmentIds] = useState<Set<string>>(new Set())
+  const [loadingChapterInScript, setLoadingChapterInScript] = useState<number | null>(null)
+  const [showLoadChapterHint, setShowLoadChapterHint] = useState(false)
+  // Track if the user has a paid plan (for upgrade modal messaging)
+  const [isFreeTrial, setIsFreeTrial] = useState(true)
 
   const scriptPanelRef = useRef<HTMLDivElement>(null)
+  const videoPanelRef = useRef<HTMLDivElement>(null)
+  const [pendingScrollSegmentId, setPendingScrollSegmentId] = useState<string | null>(null)
   const [visibleChapters, setVisibleChapters] = useState<number[]>([])
   const { isAuthenticated, isLoading: authLoading } = useAuthGate()
   const [showGate, setShowGate] = useState(false)
@@ -48,6 +61,28 @@ export default function ResultsPage() {
 
   const allChapters = getChapters(segments)
   const totalClips = searchResults.reduce((sum, r) => sum + r.videos.length, 0)
+
+  // Scroll the video panel to a newly added manual segment card once it mounts.
+  // We scroll videoPanelRef directly because its overflow-hidden parent blocks scrollIntoView.
+  useEffect(() => {
+    if (!pendingScrollSegmentId) return
+    let attempts = 0
+    const tryScroll = () => {
+      const panel = videoPanelRef.current
+      const card = document.getElementById(`segment-card-${pendingScrollSegmentId}`)
+      if (panel && card) {
+        const panelRect = panel.getBoundingClientRect()
+        const cardRect = card.getBoundingClientRect()
+        const targetScrollTop = panel.scrollTop + (cardRect.top - panelRect.top) - 20
+        panel.scrollTo({ top: targetScrollTop, behavior: 'smooth' })
+        setPendingScrollSegmentId(null)
+      } else if (attempts < 25) {
+        attempts++
+        setTimeout(tryScroll, 80)
+      }
+    }
+    tryScroll()
+  }, [pendingScrollSegmentId])
 
   // Redirect home if there's no script — but wait for sessionStorage to rehydrate first
   useEffect(() => {
@@ -80,6 +115,9 @@ export default function ResultsPage() {
   const chapter1 = allChapters[0]
   const chapter1Status = chapter1 !== undefined ? (chapterStatus[chapter1] ?? 'idle') : 'idle'
   const isLoading = isAnalyzing || (segments.length > 0 && chapter1Status !== 'done')
+
+  // Set of chapter numbers that have been analyzed (i.e. have segments in the store)
+  const analyzedChapters = new Set(segments.map((s) => s.chapter ?? 1))
 
   // Drive progress bar: 0-50% while analyzing, 50-95% while searching, 100% when done
   useEffect(() => {
@@ -163,6 +201,123 @@ export default function ResultsPage() {
     }
   }
 
+  // Fetch subscription status once the user is authenticated (for upgrade modal messaging)
+  useEffect(() => {
+    if (!isAuthenticated) return
+    fetch('/api/user/settings')
+      .then((r) => r.json())
+      .then((d) => setIsFreeTrial(!d.subscription_plan || d.subscription_status !== 'active'))
+      .catch(() => {})
+  }, [isAuthenticated])
+
+  // Show "add segment" hint on the 1st, 6th, 11th… script submission
+  // Triggers once chapter 1 is done so there's actually plain text visible to point at
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    if (!script || segments.length === 0) return
+    const count = parseInt(localStorage.getItem('clipscout_script_count') ?? '0', 10)
+    // Show on 1st, 6th, 11th… submission (count % 5 === 1)
+    if (count % 5 === 1) {
+      setShowLoadChapterHint(true)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [script, segments.length])
+
+  /**
+   * Called when user clicks "Load Chapter X" in the LEFT SCRIPT PANEL.
+   * Analyzes the chapter (deducting 1 credit) then loads its videos.
+   */
+  const handleLoadChapterFromScript = useCallback(
+    async (chapterNum: number) => {
+      const chunkIndex = chapterNum - 1
+
+      setLoadingChapterInScript(chapterNum)
+      setShowLoadChapterHint(false)
+
+      const credRes = await fetch('/api/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ script, chunkIndex, scriptContext: savedScriptContext, segmentIdOffset: segments.length }),
+      })
+
+      if (!credRes.ok) {
+        const errData = await credRes.json().catch(() => ({}))
+        setLoadingChapterInScript(null)
+        if (credRes.status === 402 || errData.error === 'INSUFFICIENT_CREDITS') {
+          setShowUpgradeModal(true)
+          return
+        }
+        console.error('Chapter analyze error:', errData)
+        return
+      }
+
+      if (!credRes.body) {
+        setLoadingChapterInScript(null)
+        return
+      }
+
+      const reader = credRes.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+      const newSegments: import('@/lib/types').ScriptSegment[] = []
+
+      try {
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+          buffer += decoder.decode(value, { stream: true })
+          const lines = buffer.split('\n')
+          buffer = lines.pop() ?? ''
+          for (const line of lines) {
+            if (!line.trim()) continue
+            const parsed = JSON.parse(line)
+            if (parsed.error === 'INSUFFICIENT_CREDITS') {
+              setShowUpgradeModal(true)
+              setLoadingChapterInScript(null)
+              return
+            }
+            if (parsed.scriptContext && !savedScriptContext) {
+              setSavedScriptContext(parsed.scriptContext)
+            }
+            if (parsed.segments) {
+              newSegments.push(...parsed.segments)
+              addSegments(parsed.segments)
+            }
+          }
+        }
+      } catch (e) {
+        console.error('Load chapter stream error:', e)
+        setLoadingChapterInScript(null)
+        return
+      }
+
+      setLoadingChapterInScript(null)
+
+      // Make the chapter visible in the right panel and search for videos
+      if (newSegments.length > 0) {
+        if (!visibleChapters.includes(chapterNum)) {
+          setVisibleChapters((prev) => [...prev, chapterNum])
+        }
+        setChapterStatus(chapterNum, 'loading')
+        try {
+          const searchRes = await fetch('/api/search', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ segments: newSegments }),
+          })
+          if (searchRes.ok) {
+            const { results } = await searchRes.json()
+            addSearchResults(results)
+          }
+        } finally {
+          setChapterStatus(chapterNum, 'done')
+        }
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [script, segments.length, savedScriptContext, visibleChapters, addSegments, addSearchResults, setChapterStatus, setShowUpgradeModal, setSavedScriptContext]
+  )
+
   const handleStartOver = () => {
     reset()
     router.push('/')
@@ -210,11 +365,7 @@ export default function ResultsPage() {
 
       addSegments([placeholder])
       setLoadingSegmentIds((prev) => new Set([...prev, id]))
-
-      // Scroll to the new card once it mounts
-      setTimeout(() => {
-        document.getElementById(`segment-card-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-      }, 150)
+      setPendingScrollSegmentId(id)
 
       let topic = text.slice(0, 60)
       let searchQueries = [text.slice(0, 80)]
@@ -264,7 +415,13 @@ export default function ResultsPage() {
 
   const handlePillClick = (segmentId: string) => {
     setActiveSegment(segmentId)
-    document.getElementById(`segment-card-${segmentId}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    const panel = videoPanelRef.current
+    const card = document.getElementById(`segment-card-${segmentId}`)
+    if (panel && card) {
+      const panelRect = panel.getBoundingClientRect()
+      const cardRect = card.getBoundingClientRect()
+      panel.scrollTo({ top: panel.scrollTop + (cardRect.top - panelRect.top) - 20, behavior: 'smooth' })
+    }
   }
 
   if (error) {
@@ -288,6 +445,12 @@ export default function ResultsPage() {
 
   return (
     <div className="min-h-screen bg-transparent flex flex-col relative">
+      {/* Upgrade modal — shown when credits run out */}
+      {showUpgradeModal && (
+        <UpgradeModal onClose={() => setShowUpgradeModal(false)} isFreeTrial={isFreeTrial} />
+      )}
+
+
       {/* Auth gate overlay */}
       {showGate && (
         <AuthGate onAuthenticated={() => setShowGate(false)} />
@@ -345,6 +508,13 @@ export default function ResultsPage() {
                 segments={segments}
                 containerRef={scriptPanelRef}
                 onAddSegment={handleAddSegment}
+                chunkOffsets={scriptChunkOffsets}
+                totalChapters={scriptChunkCount}
+                analyzedChapters={analyzedChapters}
+                onLoadChapter={handleLoadChapterFromScript}
+                loadingChapter={loadingChapterInScript}
+                showHint={showLoadChapterHint}
+                onDismissHint={() => setShowLoadChapterHint(false)}
               />
             ) : (
               <div className="space-y-2">
@@ -449,7 +619,7 @@ export default function ResultsPage() {
 
           {/* Chapter-by-chapter results */}
           {!isLoading && segments.length > 0 && (
-            <div className="flex-1 overflow-y-auto px-6 py-6 space-y-10">
+            <div ref={videoPanelRef} className="flex-1 overflow-y-auto px-6 py-6 space-y-10">
               {allChapters.map((chapterNum, chapterIdx) => {
                 const chapterSegments = segments.filter((s) => (s.chapter ?? 1) === chapterNum)
                 const isVisible = visibleChapters.includes(chapterNum)
@@ -483,20 +653,36 @@ export default function ResultsPage() {
                           const result = searchResults.find((r) => r.segmentId === segment.id)
                           const isManualLoading = loadingSegmentIds.has(segment.id)
 
-                          return (status === 'loading' && !result) || isManualLoading ? (
-                            // Per-segment skeleton while loading
-                            <div key={segment.id} className="rounded-2xl border border-purple-200 bg-white/30 p-5 space-y-3 animate-pulse">
-                              <div className="flex items-center gap-3">
-                                <div className="w-7 h-7 rounded-lg bg-purple-200" />
-                                <div className="h-4 bg-purple-200 rounded w-40" />
+                          if (isManualLoading) {
+                            return (
+                              <div key={segment.id} id={`segment-card-${segment.id}`} style={{ scrollMarginTop: '80px' }} className="rounded-2xl border border-purple-200 bg-white/50 backdrop-blur-sm p-8 flex flex-col items-center justify-center gap-3 text-center">
+                                <svg className="animate-spin w-6 h-6 text-purple-500" fill="none" viewBox="0 0 24 24">
+                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                                </svg>
+                                <p className="text-sm font-semibold text-purple-800">Loading your new segment</p>
+                                <p className="text-xs text-purple-500">Finding the best footage for your selection…</p>
                               </div>
-                              <div className="h-3 bg-purple-200 rounded w-full" />
-                              <div className="h-3 bg-purple-200 rounded w-3/4" />
-                              <div className="flex gap-3">
-                                {[1, 2, 3].map(j => <div key={j} className="w-52 h-28 rounded-xl bg-purple-200 shrink-0" />)}
+                            )
+                          }
+
+                          if (status === 'loading' && !result) {
+                            return (
+                              <div key={segment.id} id={`segment-card-${segment.id}`} style={{ scrollMarginTop: '80px' }} className="rounded-2xl border border-purple-200 bg-white/30 p-5 space-y-3 animate-pulse">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-7 h-7 rounded-lg bg-purple-200" />
+                                  <div className="h-4 bg-purple-200 rounded w-40" />
+                                </div>
+                                <div className="h-3 bg-purple-200 rounded w-full" />
+                                <div className="h-3 bg-purple-200 rounded w-3/4" />
+                                <div className="flex gap-3">
+                                  {[1, 2, 3].map(j => <div key={j} className="w-52 h-28 rounded-xl bg-purple-200 shrink-0" />)}
+                                </div>
                               </div>
-                            </div>
-                          ) : (
+                            )
+                          }
+
+                          return (
                             <SegmentCard
                               key={segment.id}
                               segment={segment}

@@ -56,4 +56,12 @@ export interface AppState {
   updateSegment: (id: string, updates: Partial<Pick<ScriptSegment, 'topic' | 'searchQueries'>>) => void
   setError: (error: string | null) => void
   reset: () => void
+  showUpgradeModal: boolean
+  setShowUpgradeModal: (value: boolean) => void
+  // Chapter-level metadata
+  scriptChunkOffsets: number[]          // character offset where each chapter starts
+  scriptChunkCount: number              // total number of chapters in the script
+  savedScriptContext: string            // global context string from Claude (reused for subsequent chapters)
+  setScriptChunks: (offsets: number[], count: number) => void
+  setSavedScriptContext: (ctx: string) => void
 }

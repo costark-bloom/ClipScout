@@ -25,7 +25,7 @@ export default function HomePage() {
         </div>
       </div>
 
-      <div className="relative" style={{zIndex:1}}>
+      <div className="relative" style={{zIndex:50}}>
         <DisclaimerBanner />
         <HomeHeader />
       </div>

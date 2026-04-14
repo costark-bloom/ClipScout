@@ -6,7 +6,9 @@ import type { AppState, ChapterStatus, ScriptSegment, SearchResults } from '@/li
 
 interface AppStateWithHydration extends AppState {
   _hasHydrated: boolean
+  showUpgradeModal: boolean
   setHasHydrated: (value: boolean) => void
+  setShowUpgradeModal: (value: boolean) => void
 }
 
 const useAppStore = create<AppStateWithHydration>()(
@@ -21,8 +23,16 @@ const useAppStore = create<AppStateWithHydration>()(
       chapterStatus: {},
       error: null,
       _hasHydrated: false,
+      showUpgradeModal: false,
+      scriptChunkOffsets: [],
+      scriptChunkCount: 1,
+      savedScriptContext: '',
 
       setHasHydrated: (value: boolean) => set({ _hasHydrated: value }),
+      setShowUpgradeModal: (value: boolean) => set({ showUpgradeModal: value }),
+      setScriptChunks: (offsets: number[], count: number) =>
+        set({ scriptChunkOffsets: offsets, scriptChunkCount: count }),
+      setSavedScriptContext: (ctx: string) => set({ savedScriptContext: ctx }),
       setScript: (script: string) => set({ script }),
       setSegments: (segments: ScriptSegment[]) => set({ segments }),
       addSegments: (newSegments: ScriptSegment[]) =>
@@ -63,6 +73,10 @@ const useAppStore = create<AppStateWithHydration>()(
           isSearching: false,
           chapterStatus: {},
           error: null,
+          showUpgradeModal: false,
+          scriptChunkOffsets: [],
+          scriptChunkCount: 1,
+          savedScriptContext: '',
         }),
     }),
     {
@@ -73,6 +87,9 @@ const useAppStore = create<AppStateWithHydration>()(
         segments: state.segments,
         searchResults: state.searchResults,
         chapterStatus: state.chapterStatus,
+        scriptChunkOffsets: state.scriptChunkOffsets,
+        scriptChunkCount: state.scriptChunkCount,
+        savedScriptContext: state.savedScriptContext,
       }),
       onRehydrateStorage: () => (state) => {
         state?.setHasHydrated(true)

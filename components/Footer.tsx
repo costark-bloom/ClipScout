@@ -8,6 +8,9 @@ export default function Footer() {
           © {new Date().getFullYear()} ClipScout. All rights reserved.
         </p>
         <div className="flex items-center gap-5 text-xs text-purple-700">
+          <Link href="/pricing" className="hover:text-purple-950 transition-colors">
+            Pricing
+          </Link>
           <Link href="/terms" className="hover:text-purple-950 transition-colors">
             Terms of Use
           </Link>

@@ -3,6 +3,8 @@
 import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import useAppStore from '@/store/useAppStore'
+import UpgradeModal from '@/components/UpgradeModal'
+import { splitIntoChunks } from '@/lib/chunks'
 
 const EXAMPLE_SCRIPTS = [
   `The Amazon rainforest, often called the "lungs of the Earth," produces about 20% of the world's oxygen. Stretching across nine countries in South America, this vast jungle is home to an estimated 10% of all species on Earth. Towering trees rise over 50 meters into the sky, forming a dense canopy that blocks out sunlight. Jaguars prowl the forest floor while colorful macaws fly overhead. Rivers wind through the jungle, teeming with piranhas and pink river dolphins. But this incredible ecosystem is under threat — deforestation rates have reached alarming levels, with fires and logging destroying millions of acres each year.`,
@@ -11,7 +13,11 @@ const EXAMPLE_SCRIPTS = [
 
 export default function ScriptInput() {
   const router = useRouter()
-  const { setScript, addSegments, setIsAnalyzing, setError, reset } = useAppStore()
+  const {
+    setScript, addSegments, setIsAnalyzing, setError, reset,
+    showUpgradeModal, setShowUpgradeModal,
+    setScriptChunks, setSavedScriptContext,
+  } = useAppStore()
   const [localScript, setLocalScript] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -28,26 +34,43 @@ export default function ScriptInput() {
   const handleSubmit = async () => {
     if (!localScript.trim() || isSubmitting) return
 
+    const trimmedScript = localScript.trim()
     setIsSubmitting(true)
     reset()
-    setScript(localScript.trim())
+    setScript(trimmedScript)
+
+    // Compute chunk boundaries client-side so the left panel knows where each chapter starts
+    const chunks = splitIntoChunks(trimmedScript)
+    setScriptChunks(
+      chunks.map((c) => c.offset),
+      chunks.length
+    )
 
     try {
       setIsAnalyzing(true)
+      // Increment before navigating so the results page reads the updated count on mount
+      const prevCount = parseInt(localStorage.getItem('clipscout_script_count') ?? '0', 10)
+      localStorage.setItem('clipscout_script_count', String(prevCount + 1))
       router.push('/results')
 
+      // Only analyze chunk 0 (chapter 1) on initial submit — remaining chapters load on demand
       const analyzeRes = await fetch('/api/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ script: localScript.trim() }),
+        body: JSON.stringify({ script: trimmedScript }),
       })
 
       if (!analyzeRes.ok || !analyzeRes.body) {
         const err = await analyzeRes.json()
+        if (analyzeRes.status === 402 || err.error === 'INSUFFICIENT_CREDITS') {
+          setIsAnalyzing(false)
+          setShowUpgradeModal(true)
+          setIsSubmitting(false)
+          return
+        }
         throw new Error(err.error || 'Failed to analyze script')
       }
 
-      // Read NDJSON stream — add segments to store as each chunk completes
       const reader = analyzeRes.body.getReader()
       const decoder = new TextDecoder()
       let buffer = ''
@@ -62,7 +85,23 @@ export default function ScriptInput() {
         for (const line of lines) {
           if (!line.trim()) continue
           const parsed = JSON.parse(line)
+          if (parsed.error === 'INSUFFICIENT_CREDITS') {
+            setIsAnalyzing(false)
+            setShowUpgradeModal(true)
+            setIsSubmitting(false)
+            return
+          }
           if (parsed.error) throw new Error(parsed.error)
+          if (parsed.chunkMeta) {
+            // Update offsets from server (authoritative)
+            setScriptChunks(
+              parsed.chunkMeta.map((c: { offset: number }) => c.offset),
+              parsed.chunkMeta.length
+            )
+          }
+          if (parsed.scriptContext) {
+            setSavedScriptContext(parsed.scriptContext)
+          }
           if (parsed.segments) {
             addSegments(parsed.segments)
             totalSegments += parsed.segments.length
@@ -85,6 +124,8 @@ export default function ScriptInput() {
   }
 
   return (
+    <>
+    {showUpgradeModal && <UpgradeModal onClose={() => setShowUpgradeModal(false)} isFreeTrial={true} />}
     <div className="w-full max-w-3xl mx-auto space-y-4">
       <div className="relative group">
         <textarea
@@ -140,5 +181,6 @@ The app will identify every visually descriptive moment — like 'towering skysc
         </button>
       </div>
     </div>
+    </>
   )
 }

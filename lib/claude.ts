@@ -1,5 +1,8 @@
 import Anthropic from '@anthropic-ai/sdk'
 import type { ScriptSegment } from './types'
+import { WORDS_PER_CHUNK, splitIntoChunks as _splitIntoChunks } from './chunks'
+
+export { splitIntoChunks } from './chunks'
 
 const client = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -23,39 +26,9 @@ Additional rules:
 
 Return only valid JSON — no markdown, no explanation, no preamble. Return an array of segment objects. Segments must not overlap. Every meaningful visual moment should be covered but generic transitions or filler phrases should be skipped.`
 
-const WORDS_PER_CHUNK = 400
-
-// Split script into chunks of ~400 words at paragraph boundaries
-export function splitIntoChunks(script: string): Array<{ text: string; offset: number }> {
-  const paragraphs = script.split(/\n\n+/)
-  const chunks: Array<{ text: string; offset: number }> = []
-
-  let currentChunk = ''
-  let currentOffset = 0
-  let chunkStartOffset = 0
-
-  for (const paragraph of paragraphs) {
-    const wordCount = (currentChunk + paragraph).split(/\s+/).filter(Boolean).length
-
-    if (currentChunk && wordCount > WORDS_PER_CHUNK) {
-      // Save current chunk and start a new one
-      chunks.push({ text: currentChunk.trim(), offset: chunkStartOffset })
-      // Find where this paragraph starts in the original script
-      chunkStartOffset = currentOffset
-      currentChunk = paragraph + '\n\n'
-    } else {
-      currentChunk += paragraph + '\n\n'
-    }
-
-    currentOffset = script.indexOf(paragraph, currentOffset) + paragraph.length + 2
-  }
-
-  if (currentChunk.trim()) {
-    chunks.push({ text: currentChunk.trim(), offset: chunkStartOffset })
-  }
-
-  return chunks
-}
+// Re-export so callers of lib/claude.ts still work
+const _wordsPerChunk = WORDS_PER_CHUNK
+void _wordsPerChunk
 
 function parseClaudeResponse(rawText: string): ScriptSegment[] {
   let text = rawText.trim()

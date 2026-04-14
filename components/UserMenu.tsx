@@ -6,11 +6,18 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 
+const PLAN_LABELS: Record<string, { label: string; color: string }> = {
+  creator: { label: 'Creator',  color: 'text-purple-600 bg-purple-100 border-purple-200' },
+  pro:     { label: 'Pro',      color: 'text-indigo-600 bg-indigo-100 border-indigo-200' },
+  agency:  { label: 'Agency',   color: 'text-blue-600 bg-blue-100 border-blue-200' },
+}
+
 export default function UserMenu() {
   const { data: session, status } = useSession()
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
+  const [planLabel, setPlanLabel] = useState<{ label: string; color: string } | null>(null)
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -22,6 +29,21 @@ export default function UserMenu() {
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [])
+
+  // Fetch current subscription plan whenever the dropdown opens
+  useEffect(() => {
+    if (!open || status !== 'authenticated') return
+    fetch('/api/user/settings')
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.subscription_plan && d.subscription_status === 'active') {
+          setPlanLabel(PLAN_LABELS[d.subscription_plan] ?? null)
+        } else {
+          setPlanLabel(null) // free trial
+        }
+      })
+      .catch(() => {})
+  }, [open, status])
 
   if (status !== 'authenticated' || !session?.user) return null
 
@@ -86,9 +108,15 @@ export default function UserMenu() {
           {/* Menu items */}
           <div className="py-1.5">
             <div className="px-4 py-2 flex items-center gap-2">
-              <span className="text-[10px] font-semibold uppercase tracking-widest text-purple-600 bg-purple-100 border border-purple-200 px-2 py-0.5 rounded-full">
-                Free plan
-              </span>
+              {planLabel ? (
+                <span className={`text-[10px] font-semibold uppercase tracking-widest px-2 py-0.5 rounded-full border ${planLabel.color}`}>
+                  {planLabel.label} plan
+                </span>
+              ) : (
+                <span className="text-[10px] font-semibold uppercase tracking-widest text-purple-600 bg-purple-100 border border-purple-200 px-2 py-0.5 rounded-full">
+                  Free plan
+                </span>
+              )}
             </div>
 
             <button
