@@ -75,14 +75,14 @@ export default function SettingsPage() {
 
   if (status === 'loading' || loading) {
     return (
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+      <div className="min-h-screen bg-transparent flex items-center justify-center">
         <div className="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-100">
+    <div className="min-h-screen bg-transparent text-gray-100">
       {/* Header */}
       <header className="border-b border-gray-900 px-6 py-4 flex items-center gap-4">
         <Link href="/" className="text-gray-400 hover:text-gray-200 transition-colors flex items-center gap-2 text-sm">

@@ -62,8 +62,8 @@ export default function SegmentCard({
       className={[
         'rounded-2xl border transition-all duration-300 overflow-hidden',
         isActive
-          ? 'border-indigo-500/60 bg-indigo-950/20 shadow-lg shadow-indigo-950/20'
-          : 'border-gray-800 bg-gray-900/50',
+          ? 'border-purple-400 bg-white/90 shadow-lg shadow-purple-200/60'
+          : 'border-purple-200 bg-white/80',
       ].join(' ')}
     >
       {/* Card header */}
@@ -71,20 +71,20 @@ export default function SegmentCard({
         <div
           className={[
             'w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold shrink-0 transition-colors',
-            isActive ? 'bg-indigo-500 text-white' : 'bg-gray-800 text-gray-400',
+            isActive ? 'bg-purple-600 text-white' : 'bg-purple-100 text-purple-600',
           ].join(' ')}
         >
           B{segmentNumber}
         </div>
         <div className="min-w-0">
-          <h3 className="text-sm font-semibold text-gray-200 truncate">{segment.topic}</h3>
-          <p className="text-[10px] text-gray-600 mt-0.5">
+          <h3 className="text-sm font-semibold text-purple-950 truncate">{segment.topic}</h3>
+          <p className="text-[10px] text-purple-500 mt-0.5">
             {videos.length} clip{videos.length !== 1 ? 's' : ''} found ·{' '}
             {segment.searchQueries.length} search queries
           </p>
         </div>
         {isActive && (
-          <span className="ml-auto shrink-0 text-[10px] font-medium text-indigo-400 bg-indigo-950/60 px-2 py-0.5 rounded-full">
+          <span className="ml-auto shrink-0 text-[10px] font-medium text-purple-600 bg-purple-100 border border-purple-200 px-2 py-0.5 rounded-full">
             Active
           </span>
         )}
@@ -93,10 +93,10 @@ export default function SegmentCard({
       {/* Script quote */}
       <blockquote
         onClick={handleQuoteClick}
-        className="mx-5 mb-4 pl-3 border-l-2 border-gray-700 hover:border-indigo-500 cursor-pointer transition-colors duration-200 group"
+        className="mx-5 mb-4 pl-3 border-l-2 border-purple-300 hover:border-purple-500 cursor-pointer transition-colors duration-200 group"
         title="Click to highlight in script"
       >
-        <p className="text-xs leading-6 text-gray-400 group-hover:text-gray-300 italic line-clamp-3 transition-colors">
+        <p className="text-xs leading-6 text-purple-700 group-hover:text-purple-950 italic line-clamp-3 transition-colors">
           &ldquo;{segment.text}&rdquo;
         </p>
       </blockquote>
@@ -104,7 +104,7 @@ export default function SegmentCard({
       {/* Search queries pills */}
       <div className="px-5 mb-4 flex flex-wrap gap-1.5">
         {segment.searchQueries.map((q, i) => (
-          <span key={i} className="text-[10px] bg-gray-800 text-gray-500 px-2 py-0.5 rounded-full">
+          <span key={i} className="text-[10px] bg-purple-100 text-purple-600 border border-purple-200 px-2 py-0.5 rounded-full">
             {q}
           </span>
         ))}
@@ -120,9 +120,9 @@ export default function SegmentCard({
           </div>
         </div>
       ) : (
-        <div className="mx-5 mb-5 rounded-xl bg-gray-800/50 border border-gray-800 px-4 py-6 text-center">
+        <div className="mx-5 mb-5 rounded-xl bg-purple-50/60 border border-purple-200 px-4 py-6 text-center">
           <svg
-            className="w-8 h-8 text-gray-700 mx-auto mb-2"
+            className="w-8 h-8 text-purple-300 mx-auto mb-2"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -130,8 +130,8 @@ export default function SegmentCard({
           >
             <path strokeLinecap="round" strokeLinejoin="round" d="m15.75 10.5 4.72-4.72a.75.75 0 0 1 1.28.53v11.38a.75.75 0 0 1-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 0 0 2.25-2.25v-9a2.25 2.25 0 0 0-2.25-2.25h-9A2.25 2.25 0 0 0 2.25 7.5v9a2.25 2.25 0 0 0 2.25 2.25Z" />
           </svg>
-          <p className="text-xs text-gray-600">No clips found for this segment.</p>
-          <p className="text-[10px] text-gray-700 mt-1">Try adjusting the search queries above.</p>
+          <p className="text-xs text-purple-600">No clips found for this segment.</p>
+          <p className="text-[10px] text-purple-400 mt-1">Try adjusting the search queries above.</p>
         </div>
       )}
     </div>

@@ -207,7 +207,7 @@ export default function InteractiveScript({
 
         if (beforeBreak) {
           nodes.push(
-            <span key={`plain-${cursor}`} data-text-start={cursor} className="text-gray-300">
+            <span key={`plain-${cursor}`} data-text-start={cursor} className="text-purple-900">
               {beforeBreak}
             </span>
           )
@@ -220,25 +220,25 @@ export default function InteractiveScript({
             contentEditable={false}
           >
             <span className="inline-flex items-center gap-1.5">
-              <span className="h-px w-6 bg-indigo-700/60 inline-block align-middle" />
-              <span className="text-[9px] font-bold uppercase tracking-widest text-indigo-500 bg-indigo-950/50 border border-indigo-900/50 px-2 py-0.5 rounded-full">
+              <span className="h-px w-6 bg-purple-300 inline-block align-middle" />
+              <span className="text-[9px] font-bold uppercase tracking-widest text-purple-600 bg-purple-100 border border-purple-200 px-2 py-0.5 rounded-full">
                 Chapter {segmentChapter}
               </span>
-              <span className="h-px flex-1 bg-indigo-700/60 inline-block align-middle" style={{ width: '100%' }} />
+              <span className="h-px flex-1 bg-purple-300 inline-block align-middle" style={{ width: '100%' }} />
             </span>
           </span>
         )
 
         if (afterBreak) {
           nodes.push(
-            <span key={`plain-after-${cursor}`} data-text-start={cursor + (lastNewline >= 0 ? lastNewline + 1 : 0)} className="text-gray-300">
+            <span key={`plain-after-${cursor}`} data-text-start={cursor + (lastNewline >= 0 ? lastNewline + 1 : 0)} className="text-purple-900">
               {afterBreak}
             </span>
           )
         }
       } else {
         nodes.push(
-          <span key={`plain-${cursor}`} data-text-start={cursor} className="text-gray-300">
+          <span key={`plain-${cursor}`} data-text-start={cursor} className="text-purple-900">
             {plainText}
           </span>
         )
@@ -250,8 +250,8 @@ export default function InteractiveScript({
           className="block my-3 select-none"
         >
           <span className="inline-flex items-center gap-1.5">
-            <span className="h-px w-6 bg-indigo-700/60 inline-block align-middle" />
-            <span className="text-[9px] font-bold uppercase tracking-widest text-indigo-500 bg-indigo-950/50 border border-indigo-900/50 px-2 py-0.5 rounded-full">
+            <span className="h-px w-6 bg-purple-300 inline-block align-middle" />
+            <span className="text-[9px] font-bold uppercase tracking-widest text-purple-600 bg-purple-100 border border-purple-200 px-2 py-0.5 rounded-full">
               Chapter {segmentChapter}
             </span>
           </span>
@@ -275,8 +275,8 @@ export default function InteractiveScript({
           'relative cursor-pointer rounded-sm transition-all duration-200 group/seg',
           'border-b-2',
           isActive
-            ? 'border-indigo-400 bg-indigo-950/60 text-indigo-100 px-0.5'
-            : 'border-indigo-600/50 text-gray-300 hover:bg-indigo-950/40 hover:border-indigo-500 hover:text-indigo-100 px-0.5',
+            ? 'border-purple-500 bg-purple-100/60 text-purple-950 px-0.5'
+            : 'border-indigo-600/50 text-purple-900 hover:bg-purple-100/60 hover:border-purple-500 hover:text-purple-950 px-0.5',
         ].join(' ')}
         title={segment.topic}
       >
@@ -285,8 +285,8 @@ export default function InteractiveScript({
           className={[
             'ml-0.5 text-[9px] font-bold tracking-wide rounded px-0.5 transition-all duration-200',
             isActive
-              ? 'text-indigo-300 opacity-100'
-              : 'text-indigo-500 opacity-0 group-hover/seg:opacity-100',
+              ? 'text-purple-600 opacity-100'
+              : 'text-purple-500 opacity-0 group-hover/seg:opacity-100',
           ].join(' ')}
         >
           {badge}
@@ -299,7 +299,7 @@ export default function InteractiveScript({
 
   if (cursor < script.length) {
     nodes.push(
-      <span key="plain-end" data-text-start={cursor} className="text-gray-300">
+      <span key="plain-end" data-text-start={cursor} className="text-purple-900">
         {script.slice(cursor)}
       </span>
     )
@@ -310,7 +310,7 @@ export default function InteractiveScript({
       <div
         ref={scriptRef}
         onMouseUp={handleMouseUp}
-        className="text-sm leading-7 whitespace-pre-wrap font-serif selection:bg-indigo-900/50"
+        className="text-sm leading-7 whitespace-pre-wrap font-serif selection:bg-purple-200"
       >
         {nodes}
       </div>

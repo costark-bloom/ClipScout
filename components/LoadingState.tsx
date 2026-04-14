@@ -27,10 +27,10 @@ export default function LoadingState({ stage, progress, segmentCount }: LoadingS
 
       <div className="text-center space-y-4 w-full max-w-sm px-4">
         <div className="space-y-2">
-          <h2 className="text-xl font-semibold text-gray-100">
+          <h2 className="text-xl font-semibold text-purple-950">
             {stage === 'analyzing' ? 'Analyzing your script…' : 'Finding footage…'}
           </h2>
-          <p className="text-sm text-gray-400 text-balance">
+          <p className="text-sm text-purple-700 text-balance">
             {stage === 'analyzing'
               ? 'AI is identifying visual moments and generating search queries.'
               : segmentCount
@@ -40,28 +40,28 @@ export default function LoadingState({ stage, progress, segmentCount }: LoadingS
         </div>
 
         {/* Progress bar */}
-        <div className="w-full bg-gray-800 rounded-full h-1.5 overflow-hidden">
+        <div className="w-full bg-purple-200 rounded-full h-1.5 overflow-hidden">
           <div
-            className="h-full bg-indigo-500 rounded-full transition-all duration-500 ease-out"
+            className="h-full bg-purple-500 rounded-full transition-all duration-500 ease-out"
             style={{ width: `${progress}%` }}
           />
         </div>
-        <p className="text-xs text-gray-600">{Math.round(progress)}%</p>
+        <p className="text-xs text-purple-500">{Math.round(progress)}%</p>
       </div>
 
       {/* Skeleton cards */}
       <div className="w-full max-w-2xl space-y-4 px-4">
         {[1, 2, 3].map((i) => (
-          <div key={i} className="rounded-xl bg-gray-900 border border-gray-800 p-4 space-y-3 animate-pulse">
+          <div key={i} className="rounded-xl bg-white/40 border border-purple-200 p-4 space-y-3 animate-pulse">
             <div className="flex items-center gap-3">
-              <div className="w-6 h-6 rounded-md bg-gray-800" />
-              <div className="h-4 bg-gray-800 rounded w-32" />
+              <div className="w-6 h-6 rounded-md bg-purple-200" />
+              <div className="h-4 bg-purple-200 rounded w-32" />
             </div>
-            <div className="h-3 bg-gray-800 rounded w-full" />
-            <div className="h-3 bg-gray-800 rounded w-4/5" />
+            <div className="h-3 bg-purple-200 rounded w-full" />
+            <div className="h-3 bg-purple-200 rounded w-4/5" />
             <div className="flex gap-3 overflow-hidden">
               {[1, 2, 3].map((j) => (
-                <div key={j} className="shrink-0 w-48 h-28 rounded-lg bg-gray-800" />
+                <div key={j} className="shrink-0 w-48 h-28 rounded-lg bg-purple-200" />
               ))}
             </div>
           </div>

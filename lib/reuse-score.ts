@@ -66,21 +66,21 @@ export function getReuseScore(video: VideoResult): ReuseScore {
 // Tailwind color classes per tier
 export const TIER_COLORS = {
   safe: {
-    bg: 'bg-green-900/40',
-    border: 'border-green-700/40',
-    text: 'text-green-400',
-    dot: 'bg-green-400',
+    bg: 'bg-white',
+    border: 'border-green-300',
+    text: 'text-green-700',
+    dot: 'bg-green-500',
   },
   caution: {
-    bg: 'bg-yellow-900/30',
-    border: 'border-yellow-700/40',
-    text: 'text-yellow-400',
-    dot: 'bg-yellow-400',
+    bg: 'bg-white',
+    border: 'border-yellow-300',
+    text: 'text-yellow-700',
+    dot: 'bg-yellow-500',
   },
   risky: {
-    bg: 'bg-red-900/30',
-    border: 'border-red-700/40',
-    text: 'text-red-400',
+    bg: 'bg-white',
+    border: 'border-red-300',
+    text: 'text-red-600',
     dot: 'bg-red-500',
   },
 }

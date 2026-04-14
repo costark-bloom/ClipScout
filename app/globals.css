@@ -20,12 +20,14 @@
   }
 
   body {
-    @apply bg-gray-950 text-gray-100 antialiased;
+    @apply text-purple-950 antialiased;
+    background: linear-gradient(180deg, #f5eeff 0%, #e8d0fa 40%, #d4a8f0 100%);
+    min-height: 100vh;
     font-family: 'Inter', system-ui, sans-serif;
   }
 
   * {
-    @apply border-gray-800;
+    @apply border-purple-200;
   }
 
   ::-webkit-scrollbar {
@@ -47,6 +49,45 @@
 }
 
 @layer utilities {
+  /* X bounce — outer wrapper, alternates left↔right */
+  @keyframes lx-a { from{transform:translateX(-220px)} to{transform:translateX(220px)} }
+  @keyframes lx-b { from{transform:translateX(-160px)} to{transform:translateX(280px)} }
+  @keyframes lx-c { from{transform:translateX(-280px)} to{transform:translateX(180px)} }
+  @keyframes lx-d { from{transform:translateX(-200px)} to{transform:translateX(240px)} }
+  .lx-a { animation: lx-a 9s  ease-in-out infinite alternate; }
+  .lx-b { animation: lx-b 13s ease-in-out infinite alternate; }
+  .lx-c { animation: lx-c 7s  ease-in-out infinite alternate; }
+  .lx-d { animation: lx-d 11s ease-in-out infinite alternate; }
+
+  /* Y bounce + morph — inner blob, alternates top↔bottom, shape morphs */
+  @keyframes ly-morph-a {
+    from { transform:translateY(-180px); border-radius:60% 40% 30% 70%/60% 30% 70% 40%; }
+    to   { transform:translateY(180px);  border-radius:30% 70% 55% 45%/50% 50% 50% 50%; }
+  }
+  @keyframes ly-morph-b {
+    from { transform:translateY(-140px); border-radius:40% 60% 60% 40%/40% 40% 60% 60%; }
+    to   { transform:translateY(200px);  border-radius:70% 30% 40% 60%/30% 70% 60% 40%; }
+  }
+  @keyframes ly-morph-c {
+    from { transform:translateY(-220px); border-radius:50% 50% 70% 30%/45% 55% 30% 70%; }
+    to   { transform:translateY(140px);  border-radius:35% 65% 45% 55%/65% 35% 55% 45%; }
+  }
+  @keyframes ly-morph-d {
+    from { transform:translateY(-160px); border-radius:65% 35% 50% 50%/35% 65% 40% 60%; }
+    to   { transform:translateY(220px);  border-radius:40% 60% 30% 70%/60% 40% 70% 30%; }
+  }
+  .ly-a { animation: ly-morph-a 11s ease-in-out infinite alternate; }
+  .ly-b { animation: ly-morph-b 8s  ease-in-out infinite alternate; }
+  .ly-c { animation: ly-morph-c 14s ease-in-out infinite alternate; }
+  .ly-d { animation: ly-morph-d 10s ease-in-out infinite alternate; }
+
+  @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-18px)} }
+  @keyframes float-slow { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-12px)} }
+  .animate-float { animation: float var(--duration,4s) ease-in-out infinite; }
+  .animate-float-slow { animation: float-slow var(--duration,6s) ease-in-out infinite; }
+  /* legacy aliases so nothing breaks */
+  .animate-lava-a {} .animate-lava-b {} .animate-lava-c {}
+
   .scroll-fade-bottom {
     mask-image: linear-gradient(to bottom, black 80%, transparent 100%);
     -webkit-mask-image: linear-gradient(to bottom, black 80%, transparent 100%);

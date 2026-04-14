@@ -95,13 +95,13 @@ export default function ScriptInput() {
 
 The app will identify every visually descriptive moment — like 'towering skyscrapers reflect the morning sun' or 'children playing in a park' — and find matching B-roll footage from YouTube, Pexels, and Pixabay."
           rows={14}
-          className="w-full bg-gray-900 border border-gray-700 text-gray-100 placeholder-gray-600 rounded-xl px-5 py-4 text-sm leading-relaxed resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 font-mono"
+          className="w-full bg-white/60 border border-purple-200 text-purple-950 placeholder-purple-400 rounded-xl px-5 py-4 text-sm leading-relaxed resize-none focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-transparent transition-all duration-200 font-mono backdrop-blur-sm"
           onKeyDown={(e) => {
             if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') handleSubmit()
           }}
         />
         <div className="absolute bottom-3 right-3 flex items-center gap-3">
-          <span className="text-xs text-gray-600">
+          <span className="text-xs text-purple-400">
             {wordCount > 0 && `${wordCount.toLocaleString()} words · ${charCount.toLocaleString()} chars`}
           </span>
         </div>
@@ -111,7 +111,7 @@ The app will identify every visually descriptive moment — like 'towering skysc
         <button
           onClick={handleSubmit}
           disabled={!localScript.trim() || isSubmitting}
-          className="flex-1 bg-indigo-600 hover:bg-indigo-500 disabled:bg-gray-800 disabled:text-gray-600 disabled:cursor-not-allowed text-white font-semibold py-3 px-6 rounded-xl transition-all duration-200 flex items-center justify-center gap-2 text-sm"
+          className="flex-1 bg-purple-600 hover:bg-purple-500 disabled:bg-purple-100 disabled:text-purple-300 disabled:cursor-not-allowed text-white font-semibold py-3 px-6 rounded-xl transition-all duration-200 flex items-center justify-center gap-2 text-sm"
         >
           {isSubmitting ? (
             <>
@@ -127,14 +127,14 @@ The app will identify every visually descriptive moment — like 'towering skysc
                 <path strokeLinecap="round" strokeLinejoin="round" d="m15.75 10.5 4.72-4.72a.75.75 0 0 1 1.28.53v11.38a.75.75 0 0 1-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 0 0 2.25-2.25v-9a2.25 2.25 0 0 0-2.25-2.25h-9A2.25 2.25 0 0 0 2.25 7.5v9a2.25 2.25 0 0 0 2.25 2.25Z" />
               </svg>
               Find B-Roll
-              <span className="text-indigo-300 text-xs font-normal">⌘↵</span>
+              <span className="text-purple-200 text-xs font-normal">⌘↵</span>
             </>
           )}
         </button>
 
         <button
           onClick={handleExample}
-          className="px-4 py-3 rounded-xl border border-gray-700 text-gray-400 hover:text-gray-200 hover:border-gray-600 text-sm transition-all duration-200"
+          className="px-4 py-3 rounded-xl border border-purple-200 text-purple-600 hover:text-purple-900 hover:border-purple-400 text-sm transition-all duration-200 bg-white/40"
         >
           Try an example
         </button>

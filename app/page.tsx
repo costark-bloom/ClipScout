@@ -4,30 +4,52 @@ import HomeHeader from '@/components/HomeHeader'
 
 export default function HomePage() {
   return (
-    <div className="min-h-screen bg-gray-950 flex flex-col">
-      <DisclaimerBanner />
-      <HomeHeader />
+    <div className="min-h-screen bg-transparent flex flex-col relative overflow-hidden">
+      {/* Lava lamp blobs — nested X/Y bounce for true lava-lamp paths */}
+      <div className="pointer-events-none absolute inset-0" style={{zIndex:0}}>
+        {/* outer = X bounce, inner = Y bounce + morph */}
+        <div className="lx-a absolute" style={{top:'15%', left:'8%', animationDelay:'0s'}}>
+          <div className="ly-b" style={{width:230, height:270, background:'rgba(139,92,246,0.38)', animationDelay:'-3s', borderRadius:'40% 60% 60% 40% / 40% 40% 60% 60%'}} />
+        </div>
+        <div className="lx-c absolute" style={{top:'10%', left:'60%', animationDelay:'-4s'}}>
+          <div className="ly-a" style={{width:180, height:220, background:'rgba(99,102,241,0.32)', animationDelay:'-1s', borderRadius:'60% 40% 30% 70% / 60% 30% 70% 40%'}} />
+        </div>
+        <div className="lx-b absolute" style={{top:'55%', left:'20%', animationDelay:'-6s'}}>
+          <div className="ly-c" style={{width:260, height:200, background:'rgba(167,139,250,0.30)', animationDelay:'-5s', borderRadius:'50% 50% 70% 30% / 45% 55% 30% 70%'}} />
+        </div>
+        <div className="lx-d absolute" style={{top:'65%', left:'55%', animationDelay:'-2s'}}>
+          <div className="ly-d" style={{width:150, height:190, background:'rgba(124,58,237,0.28)', animationDelay:'-7s', borderRadius:'65% 35% 50% 50% / 35% 65% 40% 60%'}} />
+        </div>
+        <div className="lx-a absolute" style={{top:'35%', left:'75%', animationDelay:'-8s'}}>
+          <div className="ly-b" style={{width:200, height:160, background:'rgba(196,181,253,0.32)', animationDelay:'-2s', borderRadius:'40% 60% 60% 40% / 40% 40% 60% 60%'}} />
+        </div>
+      </div>
 
-      <main className="flex-1 flex flex-col items-center justify-center px-4 py-16">
+      <div className="relative" style={{zIndex:1}}>
+        <DisclaimerBanner />
+        <HomeHeader />
+      </div>
+
+      <main className="relative flex-1 flex flex-col items-center justify-center px-4 py-16" style={{zIndex:1}}>
         {/* Logo / Hero */}
         <div className="text-center mb-12 space-y-4 animate-fade-in">
           <div className="flex flex-col items-center gap-4 mb-2">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/icon.svg" alt="ClipScout" className="w-16 h-16" />
-            <span className="text-6xl md:text-7xl font-bold tracking-tight bg-gradient-to-br from-white via-gray-100 to-gray-400 bg-clip-text text-transparent">
+            <span className="text-6xl md:text-7xl font-bold tracking-tight bg-gradient-to-br from-purple-900 via-purple-800 to-purple-600 bg-clip-text text-transparent">
               ClipScout
             </span>
           </div>
 
-          <h1 className="text-4xl md:text-5xl font-bold text-gray-100 tracking-tight text-balance">
+          <h1 className="text-4xl md:text-5xl font-bold text-purple-950 tracking-tight text-balance">
             Find the perfect clip for{' '}
-            <span className="bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
               every moment
             </span>{' '}
             in your script
           </h1>
 
-          <p className="text-lg text-gray-400 max-w-xl text-balance text-center mx-auto">
+          <p className="text-lg text-purple-700 max-w-xl text-balance text-center mx-auto">
             Paste your script. AI identifies every visual moment to discover matching b-roll footage from across the web.
           </p>
 
@@ -40,7 +62,7 @@ export default function HomePage() {
 
         {/* How it works */}
         <div className="mt-20 w-full max-w-3xl animate-fade-in">
-          <h2 className="text-xs font-semibold uppercase tracking-widest text-gray-600 text-center mb-8">
+          <h2 className="text-xs font-semibold uppercase tracking-widest text-purple-500 text-center mb-8">
             How it works
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -87,12 +109,12 @@ export default function HomePage() {
             ].map((item) => (
               <div
                 key={item.step}
-                className="bg-gray-900/50 border border-gray-800 rounded-2xl p-5 space-y-3"
+                className="bg-white/40 border border-purple-200 rounded-2xl p-5 space-y-3 backdrop-blur-sm"
               >
                 <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-lg bg-indigo-950/60 border border-indigo-900/50 flex items-center justify-center">
+                  <div className="w-9 h-9 rounded-lg bg-purple-100 border border-purple-200 flex items-center justify-center">
                     <svg
-                      className="w-4.5 h-4.5 text-indigo-400"
+                      className="w-4.5 h-4.5 text-purple-600"
                       fill="none"
                       viewBox="0 0 24 24"
                       stroke="currentColor"
@@ -101,17 +123,17 @@ export default function HomePage() {
                       {item.icon}
                     </svg>
                   </div>
-                  <span className="text-xs font-mono text-gray-700">{item.step}</span>
+                  <span className="text-xs font-mono text-purple-400">{item.step}</span>
                 </div>
-                <h3 className="text-sm font-semibold text-gray-200">{item.title}</h3>
-                <p className="text-xs text-gray-500 leading-relaxed">{item.description}</p>
+                <h3 className="text-sm font-semibold text-purple-950">{item.title}</h3>
+                <p className="text-xs text-purple-600 leading-relaxed">{item.description}</p>
               </div>
             ))}
           </div>
         </div>
       </main>
 
-      <footer className="py-6 text-center text-xs text-gray-700 border-t border-gray-900">
+      <footer className="relative py-6 text-center text-xs text-purple-600 border-t border-purple-200" style={{zIndex:1}}>
         ClipScout is a discovery tool only. All video content remains on its original platform.
       </footer>
     </div>

@@ -7,26 +7,26 @@ export const metadata = {
 
 export default function PrivacyPage() {
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-300">
+    <div className="min-h-screen bg-transparent text-purple-800">
       <div className="max-w-3xl mx-auto px-6 py-16">
         {/* Header */}
         <div className="mb-10">
-          <Link href="/" className="text-sm text-indigo-400 hover:text-indigo-300 transition-colors mb-6 inline-block">
+          <Link href="/" className="text-sm text-purple-600 hover:text-purple-800 transition-colors mb-6 inline-block">
             ← Back to ClipScout
           </Link>
-          <h1 className="text-3xl font-bold text-gray-100 mb-2">Privacy Policy</h1>
-          <p className="text-sm text-gray-500">Last updated: April 12, 2026</p>
+          <h1 className="text-3xl font-bold text-purple-950 mb-2">Privacy Policy</h1>
+          <p className="text-sm text-purple-600">Last updated: April 12, 2026</p>
         </div>
 
-        <div className="prose prose-invert prose-sm max-w-none space-y-8 text-gray-300 leading-relaxed">
+        <div className="prose prose prose-sm max-w-none space-y-8 text-purple-800 leading-relaxed">
 
           <section>
-            <h2 className="text-lg font-semibold text-gray-100 mb-3">1. Introduction</h2>
+            <h2 className="text-lg font-semibold text-purple-950 mb-3">1. Introduction</h2>
             <p>
               ClipScout (&quot;we,&quot; &quot;us,&quot; or &quot;our&quot;) is committed to protecting your privacy.
               This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you
               visit our website at{' '}
-              <a href="https://www.clipscout.app" className="text-indigo-400 hover:text-indigo-300">
+              <a href="https://www.clipscout.app" className="text-purple-600 hover:text-purple-800">
                 www.clipscout.app
               </a>{' '}
               and use our Service.
@@ -38,12 +38,12 @@ export default function PrivacyPage() {
             </p>
             <p className="mt-3">
               This Privacy Policy should be read alongside our{' '}
-              <Link href="/terms" className="text-indigo-400 hover:text-indigo-300">Terms of Use</Link>.
+              <Link href="/terms" className="text-purple-600 hover:text-purple-800">Terms of Use</Link>.
             </p>
           </section>
 
           <section>
-            <h2 className="text-lg font-semibold text-gray-100 mb-3">2. Information We Collect</h2>
+            <h2 className="text-lg font-semibold text-purple-950 mb-3">2. Information We Collect</h2>
 
             <h3 className="text-base font-medium text-gray-200 mt-4 mb-2">2.1 Information You Provide Directly</h3>
             <ul className="list-disc list-inside space-y-2 text-sm">
@@ -69,7 +69,7 @@ export default function PrivacyPage() {
           </section>
 
           <section>
-            <h2 className="text-lg font-semibold text-gray-100 mb-3">3. YouTube API Data — Special Disclosures</h2>
+            <h2 className="text-lg font-semibold text-purple-950 mb-3">3. YouTube API Data — Special Disclosures</h2>
             <p>
               ClipScout uses the <strong className="text-gray-200">YouTube Data API v3</strong> provided by Google.
               This section specifically addresses how we handle data obtained through the YouTube API, in compliance
@@ -114,7 +114,7 @@ export default function PrivacyPage() {
             <p className="text-sm">
               You may request deletion of all YouTube API data associated with your account at any time by deleting
               your saved scripts or by contacting us at{' '}
-              <a href="mailto:colestark9@gmail.com" className="text-indigo-400 hover:text-indigo-300">
+              <a href="mailto:colestark9@gmail.com" className="text-purple-600 hover:text-purple-800">
                 colestark9@gmail.com
               </a>. We will process deletion requests within 30 days.
             </p>
@@ -125,17 +125,17 @@ export default function PrivacyPage() {
             </p>
             <ul className="list-disc list-inside mt-2 space-y-2 text-sm">
               <li>
-                <a href="https://www.youtube.com/t/terms" target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:text-indigo-300">
+                <a href="https://www.youtube.com/t/terms" target="_blank" rel="noopener noreferrer" className="text-purple-600 hover:text-purple-800">
                   YouTube Terms of Service
                 </a>
               </li>
               <li>
-                <a href="https://developers.google.com/youtube/terms/developer-policies" target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:text-indigo-300">
+                <a href="https://developers.google.com/youtube/terms/developer-policies" target="_blank" rel="noopener noreferrer" className="text-purple-600 hover:text-purple-800">
                   YouTube API Services Developer Policies
                 </a>
               </li>
               <li>
-                <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:text-indigo-300">
+                <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer" className="text-purple-600 hover:text-purple-800">
                   Google Privacy Policy
                 </a>
               </li>
@@ -143,7 +143,7 @@ export default function PrivacyPage() {
           </section>
 
           <section>
-            <h2 className="text-lg font-semibold text-gray-100 mb-3">4. How We Use Your Information</h2>
+            <h2 className="text-lg font-semibold text-purple-950 mb-3">4. How We Use Your Information</h2>
             <p>We use the information we collect to:</p>
             <ul className="list-disc list-inside mt-3 space-y-2 text-sm">
               <li>Provide, operate, and improve the ClipScout Service</li>
@@ -164,55 +164,55 @@ export default function PrivacyPage() {
           </section>
 
           <section>
-            <h2 className="text-lg font-semibold text-gray-100 mb-3">5. Third-Party Services</h2>
+            <h2 className="text-lg font-semibold text-purple-950 mb-3">5. Third-Party Services</h2>
             <p>ClipScout integrates with the following third-party services. Each has its own privacy policy:</p>
 
             <div className="mt-4 space-y-4">
               <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
                 <p className="font-medium text-gray-200 text-sm mb-1">Google / YouTube</p>
-                <p className="text-xs text-gray-500 mb-2">Authentication (Google OAuth) and video search (YouTube Data API v3)</p>
-                <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer" className="text-xs text-indigo-400 hover:text-indigo-300">policies.google.com/privacy →</a>
+                <p className="text-xs text-purple-600 mb-2">Authentication (Google OAuth) and video search (YouTube Data API v3)</p>
+                <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer" className="text-xs text-purple-600 hover:text-purple-800">policies.google.com/privacy →</a>
               </div>
               <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
                 <p className="font-medium text-gray-200 text-sm mb-1">Anthropic</p>
-                <p className="text-xs text-gray-500 mb-2">AI analysis of your script content. Script text is sent to our AI provider&apos;s servers for processing.</p>
-                <a href="https://www.anthropic.com/privacy" target="_blank" rel="noopener noreferrer" className="text-xs text-indigo-400 hover:text-indigo-300">anthropic.com/privacy →</a>
+                <p className="text-xs text-purple-600 mb-2">AI analysis of your script content. Script text is sent to our AI provider&apos;s servers for processing.</p>
+                <a href="https://www.anthropic.com/privacy" target="_blank" rel="noopener noreferrer" className="text-xs text-purple-600 hover:text-purple-800">anthropic.com/privacy →</a>
               </div>
               <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
                 <p className="font-medium text-gray-200 text-sm mb-1">Pexels</p>
-                <p className="text-xs text-gray-500 mb-2">Royalty-free video search results</p>
-                <a href="https://www.pexels.com/privacy-policy/" target="_blank" rel="noopener noreferrer" className="text-xs text-indigo-400 hover:text-indigo-300">pexels.com/privacy-policy →</a>
+                <p className="text-xs text-purple-600 mb-2">Royalty-free video search results</p>
+                <a href="https://www.pexels.com/privacy-policy/" target="_blank" rel="noopener noreferrer" className="text-xs text-purple-600 hover:text-purple-800">pexels.com/privacy-policy →</a>
               </div>
               <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
                 <p className="font-medium text-gray-200 text-sm mb-1">Pixabay</p>
-                <p className="text-xs text-gray-500 mb-2">Royalty-free video search results</p>
-                <a href="https://pixabay.com/service/privacy/" target="_blank" rel="noopener noreferrer" className="text-xs text-indigo-400 hover:text-indigo-300">pixabay.com/service/privacy →</a>
+                <p className="text-xs text-purple-600 mb-2">Royalty-free video search results</p>
+                <a href="https://pixabay.com/service/privacy/" target="_blank" rel="noopener noreferrer" className="text-xs text-purple-600 hover:text-purple-800">pixabay.com/service/privacy →</a>
               </div>
               <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
                 <p className="font-medium text-gray-200 text-sm mb-1">Supabase</p>
-                <p className="text-xs text-gray-500 mb-2">Database for storing user accounts and saved scripts</p>
-                <a href="https://supabase.com/privacy" target="_blank" rel="noopener noreferrer" className="text-xs text-indigo-400 hover:text-indigo-300">supabase.com/privacy →</a>
+                <p className="text-xs text-purple-600 mb-2">Database for storing user accounts and saved scripts</p>
+                <a href="https://supabase.com/privacy" target="_blank" rel="noopener noreferrer" className="text-xs text-purple-600 hover:text-purple-800">supabase.com/privacy →</a>
               </div>
               <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
                 <p className="font-medium text-gray-200 text-sm mb-1">Mixpanel</p>
-                <p className="text-xs text-gray-500 mb-2">Analytics and session replay to help us improve the Service</p>
-                <a href="https://mixpanel.com/legal/privacy-policy/" target="_blank" rel="noopener noreferrer" className="text-xs text-indigo-400 hover:text-indigo-300">mixpanel.com/legal/privacy-policy →</a>
+                <p className="text-xs text-purple-600 mb-2">Analytics and session replay to help us improve the Service</p>
+                <a href="https://mixpanel.com/legal/privacy-policy/" target="_blank" rel="noopener noreferrer" className="text-xs text-purple-600 hover:text-purple-800">mixpanel.com/legal/privacy-policy →</a>
               </div>
               <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
                 <p className="font-medium text-gray-200 text-sm mb-1">Supadata</p>
-                <p className="text-xs text-gray-500 mb-2">YouTube transcript retrieval for timestamp accuracy</p>
-                <a href="https://supadata.ai/privacy" target="_blank" rel="noopener noreferrer" className="text-xs text-indigo-400 hover:text-indigo-300">supadata.ai/privacy →</a>
+                <p className="text-xs text-purple-600 mb-2">YouTube transcript retrieval for timestamp accuracy</p>
+                <a href="https://supadata.ai/privacy" target="_blank" rel="noopener noreferrer" className="text-xs text-purple-600 hover:text-purple-800">supadata.ai/privacy →</a>
               </div>
               <div className="bg-gray-900 border border-gray-800 rounded-xl p-4">
                 <p className="font-medium text-gray-200 text-sm mb-1">Render</p>
-                <p className="text-xs text-gray-500 mb-2">Cloud hosting infrastructure for ClipScout</p>
-                <a href="https://render.com/privacy" target="_blank" rel="noopener noreferrer" className="text-xs text-indigo-400 hover:text-indigo-300">render.com/privacy →</a>
+                <p className="text-xs text-purple-600 mb-2">Cloud hosting infrastructure for ClipScout</p>
+                <a href="https://render.com/privacy" target="_blank" rel="noopener noreferrer" className="text-xs text-purple-600 hover:text-purple-800">render.com/privacy →</a>
               </div>
             </div>
           </section>
 
           <section>
-            <h2 className="text-lg font-semibold text-gray-100 mb-3">6. Data Retention</h2>
+            <h2 className="text-lg font-semibold text-purple-950 mb-3">6. Data Retention</h2>
             <ul className="list-disc list-inside space-y-2 text-sm">
               <li><strong className="text-gray-200">Account data:</strong> Retained for as long as your account is active or until you request deletion.</li>
               <li><strong className="text-gray-200">Saved scripts:</strong> Retained until you delete them or request account deletion.</li>
@@ -224,7 +224,7 @@ export default function PrivacyPage() {
           </section>
 
           <section>
-            <h2 className="text-lg font-semibold text-gray-100 mb-3">7. Data Security</h2>
+            <h2 className="text-lg font-semibold text-purple-950 mb-3">7. Data Security</h2>
             <p>
               We implement reasonable technical and organizational measures to protect your personal information
               against unauthorized access, alteration, disclosure, or destruction. These measures include:
@@ -242,7 +242,7 @@ export default function PrivacyPage() {
           </section>
 
           <section>
-            <h2 className="text-lg font-semibold text-gray-100 mb-3">8. Your Rights</h2>
+            <h2 className="text-lg font-semibold text-purple-950 mb-3">8. Your Rights</h2>
             <p>Depending on your location, you may have the following rights regarding your personal data:</p>
             <ul className="list-disc list-inside mt-3 space-y-2 text-sm">
               <li><strong className="text-gray-200">Access:</strong> Request a copy of the personal data we hold about you.</li>
@@ -254,14 +254,14 @@ export default function PrivacyPage() {
             </ul>
             <p className="mt-3">
               To exercise any of these rights, contact us at{' '}
-              <a href="mailto:colestark9@gmail.com" className="text-indigo-400 hover:text-indigo-300">
+              <a href="mailto:colestark9@gmail.com" className="text-purple-600 hover:text-purple-800">
                 colestark9@gmail.com
               </a>. We will respond to requests within 30 days.
             </p>
           </section>
 
           <section>
-            <h2 className="text-lg font-semibold text-gray-100 mb-3">9. Children&apos;s Privacy</h2>
+            <h2 className="text-lg font-semibold text-purple-950 mb-3">9. Children&apos;s Privacy</h2>
             <p>
               ClipScout is not directed at children under the age of 13. We do not knowingly collect personal
               information from children under 13. If we become aware that we have collected personal information from
@@ -270,7 +270,7 @@ export default function PrivacyPage() {
           </section>
 
           <section>
-            <h2 className="text-lg font-semibold text-gray-100 mb-3">10. International Data Transfers</h2>
+            <h2 className="text-lg font-semibold text-purple-950 mb-3">10. International Data Transfers</h2>
             <p>
               ClipScout is operated from the United States. If you are located outside the United States, please be
               aware that your information may be transferred to, stored, and processed in the United States and other
@@ -280,7 +280,7 @@ export default function PrivacyPage() {
           </section>
 
           <section>
-            <h2 className="text-lg font-semibold text-gray-100 mb-3">11. Changes to This Privacy Policy</h2>
+            <h2 className="text-lg font-semibold text-purple-950 mb-3">11. Changes to This Privacy Policy</h2>
             <p>
               We may update this Privacy Policy from time to time. We will notify you of any changes by updating the
               &quot;Last updated&quot; date at the top of this page. We encourage you to review this Privacy Policy
@@ -290,15 +290,15 @@ export default function PrivacyPage() {
           </section>
 
           <section>
-            <h2 className="text-lg font-semibold text-gray-100 mb-3">12. Contact Us</h2>
+            <h2 className="text-lg font-semibold text-purple-950 mb-3">12. Contact Us</h2>
             <p>
               If you have any questions, concerns, or requests regarding this Privacy Policy or our data practices,
               please contact us:
             </p>
             <div className="mt-3 bg-gray-900 border border-gray-800 rounded-xl p-4 text-sm space-y-1">
               <p className="text-gray-200 font-medium">ClipScout</p>
-              <p>Email: <a href="mailto:colestark9@gmail.com" className="text-indigo-400 hover:text-indigo-300">colestark9@gmail.com</a></p>
-              <p>Website: <a href="https://www.clipscout.app" className="text-indigo-400 hover:text-indigo-300">www.clipscout.app</a></p>
+              <p>Email: <a href="mailto:colestark9@gmail.com" className="text-purple-600 hover:text-purple-800">colestark9@gmail.com</a></p>
+              <p>Website: <a href="https://www.clipscout.app" className="text-purple-600 hover:text-purple-800">www.clipscout.app</a></p>
             </div>
           </section>
 

@@ -28,7 +28,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className="dark">
-      <body className="min-h-screen bg-gray-950 flex flex-col">
+      <body className="min-h-screen flex flex-col">
         <SessionProvider>
           <MixpanelIdentify />
           <div className="flex-1">{children}</div>

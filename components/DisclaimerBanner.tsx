@@ -8,9 +8,9 @@ export default function DisclaimerBanner() {
   if (dismissed) return null
 
   return (
-    <div className="relative bg-amber-950/60 border border-amber-800/50 text-amber-200 px-4 py-2.5 text-xs flex items-start gap-3">
+    <div className="relative bg-amber-50/80 border border-amber-300 text-amber-800 px-4 py-2.5 text-xs flex items-start gap-3">
       <svg
-        className="w-4 h-4 mt-0.5 shrink-0 text-amber-400"
+        className="w-4 h-4 mt-0.5 shrink-0 text-amber-500"
         fill="none"
         viewBox="0 0 24 24"
         stroke="currentColor"
@@ -23,7 +23,7 @@ export default function DisclaimerBanner() {
         />
       </svg>
       <span className="flex-1">
-        <strong className="font-semibold text-amber-300">Copyright notice:</strong> ClipScout
+        <strong className="font-semibold text-amber-700">Copyright notice:</strong> ClipScout
         discovers and previews publicly available video content. It does not download or host any
         videos. Verifying licensing terms and obtaining proper rights before using footage in your
         projects is your responsibility. YouTube content is subject to YouTube&apos;s Terms of
@@ -31,7 +31,7 @@ export default function DisclaimerBanner() {
       </span>
       <button
         onClick={() => setDismissed(true)}
-        className="shrink-0 text-amber-400 hover:text-amber-200 transition-colors ml-2"
+        className="shrink-0 text-amber-500 hover:text-amber-700 transition-colors ml-2"
         aria-label="Dismiss disclaimer"
       >
         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

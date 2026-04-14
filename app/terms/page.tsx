@@ -7,33 +7,33 @@ export const metadata = {
 
 export default function TermsPage() {
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-300">
+    <div className="min-h-screen bg-transparent text-purple-800">
       <div className="max-w-3xl mx-auto px-6 py-16">
         {/* Header */}
         <div className="mb-10">
-          <Link href="/" className="text-sm text-indigo-400 hover:text-indigo-300 transition-colors mb-6 inline-block">
+          <Link href="/" className="text-sm text-purple-600 hover:text-purple-800 transition-colors mb-6 inline-block">
             ← Back to ClipScout
           </Link>
-          <h1 className="text-3xl font-bold text-gray-100 mb-2">Terms of Use</h1>
-          <p className="text-sm text-gray-500">Last updated: April 12, 2026</p>
+          <h1 className="text-3xl font-bold text-purple-950 mb-2">Terms of Use</h1>
+          <p className="text-sm text-purple-600">Last updated: April 12, 2026</p>
         </div>
 
-        <div className="prose prose-invert prose-sm max-w-none space-y-8 text-gray-300 leading-relaxed">
+        <div className="prose prose prose-sm max-w-none space-y-8 text-purple-800 leading-relaxed">
 
           <section>
-            <h2 className="text-lg font-semibold text-gray-100 mb-3">1. Acceptance of Terms</h2>
+            <h2 className="text-lg font-semibold text-purple-950 mb-3">1. Acceptance of Terms</h2>
             <p>
               By accessing or using ClipScout (&quot;the Service,&quot; &quot;we,&quot; &quot;us,&quot; or &quot;our&quot;), located at{' '}
-              <a href="https://www.clipscout.app" className="text-indigo-400 hover:text-indigo-300">www.clipscout.app</a>,
+              <a href="https://www.clipscout.app" className="text-purple-600 hover:text-purple-800">www.clipscout.app</a>,
               you agree to be bound by these Terms of Use and all applicable laws and regulations. If you do not agree
               with any of these terms, you are prohibited from using this Service. These Terms of Use, together with our{' '}
-              <Link href="/privacy" className="text-indigo-400 hover:text-indigo-300">Privacy Policy</Link>, constitute
+              <Link href="/privacy" className="text-purple-600 hover:text-purple-800">Privacy Policy</Link>, constitute
               the entire agreement between you and ClipScout.
             </p>
           </section>
 
           <section>
-            <h2 className="text-lg font-semibold text-gray-100 mb-3">2. Description of Service</h2>
+            <h2 className="text-lg font-semibold text-purple-950 mb-3">2. Description of Service</h2>
             <p>
               ClipScout is an AI-powered video discovery tool that helps content creators find relevant B-roll footage.
               Users paste a video script, and the Service uses artificial intelligence to identify visual moments and
@@ -48,19 +48,19 @@ export default function TermsPage() {
           </section>
 
           <section>
-            <h2 className="text-lg font-semibold text-gray-100 mb-3">3. YouTube API Services</h2>
+            <h2 className="text-lg font-semibold text-purple-950 mb-3">3. YouTube API Services</h2>
             <p>
               ClipScout uses the <strong className="text-gray-200">YouTube Data API v3</strong> to search for and
               display publicly available YouTube videos. By using ClipScout, you also agree to be bound by:
             </p>
             <ul className="list-disc list-inside mt-3 space-y-2 text-sm">
               <li>
-                <a href="https://www.youtube.com/t/terms" target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:text-indigo-300">
+                <a href="https://www.youtube.com/t/terms" target="_blank" rel="noopener noreferrer" className="text-purple-600 hover:text-purple-800">
                   YouTube Terms of Service
                 </a>
               </li>
               <li>
-                <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:text-indigo-300">
+                <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer" className="text-purple-600 hover:text-purple-800">
                   Google Privacy Policy
                 </a>
               </li>
@@ -80,7 +80,7 @@ export default function TermsPage() {
           </section>
 
           <section>
-            <h2 className="text-lg font-semibold text-gray-100 mb-3">4. Third-Party Content and Platforms</h2>
+            <h2 className="text-lg font-semibold text-purple-950 mb-3">4. Third-Party Content and Platforms</h2>
             <p>
               The Service aggregates and displays video search results from the following third-party platforms:
             </p>
@@ -97,7 +97,7 @@ export default function TermsPage() {
           </section>
 
           <section>
-            <h2 className="text-lg font-semibold text-gray-100 mb-3">5. Copyright and Intellectual Property</h2>
+            <h2 className="text-lg font-semibold text-purple-950 mb-3">5. Copyright and Intellectual Property</h2>
             <p>
               ClipScout is a <strong className="text-gray-200">discovery tool only</strong>. We do not grant any
               rights, licenses, or permissions to use, reproduce, distribute, or create derivative works from any
@@ -117,7 +117,7 @@ export default function TermsPage() {
           </section>
 
           <section>
-            <h2 className="text-lg font-semibold text-gray-100 mb-3">6. User Responsibilities</h2>
+            <h2 className="text-lg font-semibold text-purple-950 mb-3">6. User Responsibilities</h2>
             <p>By using ClipScout, you agree that you will:</p>
             <ul className="list-disc list-inside mt-3 space-y-2 text-sm">
               <li>Use the Service only for lawful purposes and in compliance with all applicable laws and regulations</li>
@@ -132,7 +132,7 @@ export default function TermsPage() {
           </section>
 
           <section>
-            <h2 className="text-lg font-semibold text-gray-100 mb-3">7. Prohibited Uses</h2>
+            <h2 className="text-lg font-semibold text-purple-950 mb-3">7. Prohibited Uses</h2>
             <p>You are expressly prohibited from:</p>
             <ul className="list-disc list-inside mt-3 space-y-2 text-sm">
               <li>Downloading or attempting to download any video content surfaced through the Service</li>
@@ -146,7 +146,7 @@ export default function TermsPage() {
           </section>
 
           <section>
-            <h2 className="text-lg font-semibold text-gray-100 mb-3">8. User Accounts</h2>
+            <h2 className="text-lg font-semibold text-purple-950 mb-3">8. User Accounts</h2>
             <p>
               To access certain features of the Service, you must create an account. You are responsible for
               maintaining the confidentiality of your account credentials and for all activity that occurs under your
@@ -160,7 +160,7 @@ export default function TermsPage() {
           </section>
 
           <section>
-            <h2 className="text-lg font-semibold text-gray-100 mb-3">9. Copyright Disclaimer</h2>
+            <h2 className="text-lg font-semibold text-purple-950 mb-3">9. Copyright Disclaimer</h2>
             <p>
               ClipScout displays publicly available video content solely for the purpose of discovery and preview.
               This use is intended to be consistent with the principles of fair use and the explicit embedding
@@ -176,7 +176,7 @@ export default function TermsPage() {
           </section>
 
           <section>
-            <h2 className="text-lg font-semibold text-gray-100 mb-3">10. Disclaimers and Limitation of Liability</h2>
+            <h2 className="text-lg font-semibold text-purple-950 mb-3">10. Disclaimers and Limitation of Liability</h2>
             <p>
               THE SERVICE IS PROVIDED &quot;AS IS&quot; AND &quot;AS AVAILABLE&quot; WITHOUT WARRANTIES OF ANY KIND,
               EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR
@@ -195,17 +195,17 @@ export default function TermsPage() {
           </section>
 
           <section>
-            <h2 className="text-lg font-semibold text-gray-100 mb-3">11. Privacy</h2>
+            <h2 className="text-lg font-semibold text-purple-950 mb-3">11. Privacy</h2>
             <p>
               Your use of ClipScout is also governed by our{' '}
-              <Link href="/privacy" className="text-indigo-400 hover:text-indigo-300">Privacy Policy</Link>, which
+              <Link href="/privacy" className="text-purple-600 hover:text-purple-800">Privacy Policy</Link>, which
               is incorporated into these Terms of Use by reference. The Privacy Policy describes how we collect, use,
               and share information about you when you use the Service.
             </p>
           </section>
 
           <section>
-            <h2 className="text-lg font-semibold text-gray-100 mb-3">12. Modifications to Terms</h2>
+            <h2 className="text-lg font-semibold text-purple-950 mb-3">12. Modifications to Terms</h2>
             <p>
               We reserve the right to modify these Terms of Use at any time. We will notify users of material changes
               by updating the &quot;Last updated&quot; date at the top of this page. Your continued use of the Service
@@ -214,7 +214,7 @@ export default function TermsPage() {
           </section>
 
           <section>
-            <h2 className="text-lg font-semibold text-gray-100 mb-3">13. Governing Law</h2>
+            <h2 className="text-lg font-semibold text-purple-950 mb-3">13. Governing Law</h2>
             <p>
               These Terms of Use shall be governed by and construed in accordance with the laws of the United States,
               without regard to its conflict of law provisions. Any disputes arising under these Terms shall be subject
@@ -223,10 +223,10 @@ export default function TermsPage() {
           </section>
 
           <section>
-            <h2 className="text-lg font-semibold text-gray-100 mb-3">14. Contact</h2>
+            <h2 className="text-lg font-semibold text-purple-950 mb-3">14. Contact</h2>
             <p>
               If you have any questions about these Terms of Use, please contact us at{' '}
-              <a href="mailto:colestark9@gmail.com" className="text-indigo-400 hover:text-indigo-300">
+              <a href="mailto:colestark9@gmail.com" className="text-purple-600 hover:text-purple-800">
                 colestark9@gmail.com
               </a>.
             </p>

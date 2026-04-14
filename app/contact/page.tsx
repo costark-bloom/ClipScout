@@ -41,7 +41,7 @@ export default function ContactPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-100 flex flex-col">
+    <div className="min-h-screen bg-transparent text-gray-100 flex flex-col">
       {/* Header */}
       <header className="border-b border-gray-900 px-6 py-4 flex items-center gap-4">
         <Link href="/" className="flex items-center gap-2 group">

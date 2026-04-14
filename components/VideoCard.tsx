@@ -48,11 +48,11 @@ export default function VideoCard({ video }: VideoCardProps) {
 
   return (
     <>
-      <div className="shrink-0 w-52 bg-gray-900 border border-gray-800 rounded-xl overflow-hidden hover:border-gray-700 transition-all duration-200 group flex flex-col">
+      <div className="shrink-0 w-52 bg-purple-100/70 border border-purple-200 rounded-xl overflow-hidden hover:border-purple-400 transition-all duration-200 group flex flex-col backdrop-blur-sm">
         {/* Thumbnail — clicking anywhere on it opens preview */}
         <button
           onClick={() => setShowPreview(true)}
-          className="relative aspect-video bg-gray-800 overflow-hidden w-full block focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+          className="relative aspect-video bg-purple-100 overflow-hidden w-full block focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400"
           aria-label={`Preview ${video.title}`}
         >
           {!imgError && video.thumbnailUrl ? (
@@ -65,7 +65,7 @@ export default function VideoCard({ video }: VideoCardProps) {
               unoptimized
             />
           ) : (
-            <div className="w-full h-full flex items-center justify-center text-gray-700">
+            <div className="w-full h-full flex items-center justify-center text-purple-300">
               <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="m15.75 10.5 4.72-4.72a.75.75 0 0 1 1.28.53v11.38a.75.75 0 0 1-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 0 0 2.25-2.25v-9a2.25 2.25 0 0 0-2.25-2.25h-9A2.25 2.25 0 0 0 2.25 7.5v9a2.25 2.25 0 0 0 2.25 2.25Z" />
               </svg>
@@ -98,7 +98,7 @@ export default function VideoCard({ video }: VideoCardProps) {
 
         {/* Info */}
         <div className="p-2.5 flex flex-col gap-1.5 flex-1">
-          <p className="text-xs font-medium text-gray-200 line-clamp-2 leading-relaxed">
+          <p className="text-xs font-medium text-purple-950 line-clamp-2 leading-relaxed">
             {video.title}
           </p>
           {video.channelOrAuthor && (
@@ -120,34 +120,34 @@ export default function VideoCard({ video }: VideoCardProps) {
               </span>
             </button>
             {showScoreDetail && (
-              <div className="absolute bottom-full left-0 right-0 mb-1.5 z-10 bg-gray-800 border border-gray-700 rounded-lg p-2.5 shadow-xl">
+              <div className="absolute bottom-full left-0 right-0 mb-1.5 z-10 bg-white/90 backdrop-blur-sm border border-purple-200 rounded-lg p-2.5 shadow-xl">
                 <p className={`text-[9px] font-bold uppercase tracking-wider mb-1 ${scoreColors.text}`}>
                   Safe Use Score: {reuseScore.score}%
                 </p>
-                <p className="text-[10px] text-gray-300 leading-relaxed">{reuseScore.detail}</p>
+                <p className="text-[10px] text-purple-800 leading-relaxed">{reuseScore.detail}</p>
               </div>
             )}
           </div>
 
           {/* Transcript-based relevance info */}
           {video.transcriptReason && (
-            <div className="bg-indigo-950/40 border border-indigo-900/40 rounded-md px-2 py-1.5 space-y-1">
+            <div className="bg-white border border-purple-200 rounded-md px-2 py-1.5 space-y-1">
               <div className="flex items-center gap-1">
-                <span className="text-[9px] font-bold uppercase tracking-wider text-indigo-400">Transcript match</span>
+                <span className="text-[9px] font-bold uppercase tracking-wider text-purple-600">Transcript match</span>
                 {video.relevanceScore !== undefined && (
                   <span className={`text-[9px] font-bold ml-auto ${
-                    video.relevanceScore >= 0.7 ? 'text-green-400' :
-                    video.relevanceScore >= 0.4 ? 'text-yellow-400' : 'text-gray-500'
+                    video.relevanceScore >= 0.7 ? 'text-green-600' :
+                    video.relevanceScore >= 0.4 ? 'text-yellow-600' : 'text-purple-400'
                   }`}>
                     {Math.round(video.relevanceScore * 100)}%
                   </span>
                 )}
               </div>
-              <p className="text-[10px] text-gray-400 leading-relaxed line-clamp-2">
+              <p className="text-[10px] text-purple-700 leading-relaxed line-clamp-2">
                 {video.transcriptReason}
               </p>
               {video.transcriptSnippet && (
-                <p className="text-[9px] text-indigo-400/80 italic line-clamp-1">
+                <p className="text-[9px] text-purple-500 italic line-clamp-1">
                   &ldquo;{video.transcriptSnippet}&rdquo;
                 </p>
               )}
@@ -158,7 +158,7 @@ export default function VideoCard({ video }: VideoCardProps) {
           <div className="flex gap-1.5 mt-auto pt-1">
             <button
               onClick={() => setShowPreview(true)}
-              className="flex-1 text-[10px] font-medium bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-300 rounded-md py-1 px-2 transition-colors duration-150 flex items-center justify-center gap-1"
+              className="flex-1 text-[10px] font-medium bg-white hover:bg-purple-50 text-purple-700 border border-purple-200 rounded-md py-1 px-2 transition-colors duration-150 flex items-center justify-center gap-1"
             >
               <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z" />
@@ -169,7 +169,7 @@ export default function VideoCard({ video }: VideoCardProps) {
               href={video.sourceUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex-1 text-[10px] font-medium bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-gray-200 rounded-md py-1 px-2 transition-colors duration-150 flex items-center justify-center gap-1"
+              className="flex-1 text-[10px] font-medium bg-white hover:bg-purple-50 text-purple-600 hover:text-purple-900 border border-purple-200 rounded-md py-1 px-2 transition-colors duration-150 flex items-center justify-center gap-1"
             >
               <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
