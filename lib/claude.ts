@@ -1,6 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk'
 import type { ScriptSegment } from './types'
-import { WORDS_PER_CHUNK, splitIntoChunks as _splitIntoChunks } from './chunks'
+import { WORDS_PER_CHUNK, splitIntoChunks } from './chunks'
 
 export { splitIntoChunks } from './chunks'
 
