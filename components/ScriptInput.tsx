@@ -7,8 +7,21 @@ import UpgradeModal from '@/components/UpgradeModal'
 import { splitIntoChunks } from '@/lib/chunks'
 
 const EXAMPLE_SCRIPTS = [
-  `The Amazon rainforest, often called the "lungs of the Earth," produces about 20% of the world's oxygen. Stretching across nine countries in South America, this vast jungle is home to an estimated 10% of all species on Earth. Towering trees rise over 50 meters into the sky, forming a dense canopy that blocks out sunlight. Jaguars prowl the forest floor while colorful macaws fly overhead. Rivers wind through the jungle, teeming with piranhas and pink river dolphins. But this incredible ecosystem is under threat — deforestation rates have reached alarming levels, with fires and logging destroying millions of acres each year.`,
-  `Electric vehicles are transforming how we think about transportation. Modern EVs can travel over 300 miles on a single charge, with charging stations now appearing in parking lots, shopping malls, and highways across the country. Inside, the cabins are minimalist and tech-forward — large touchscreens replacing traditional dashboards. Manufacturing plants hum with robotic arms assembling battery packs with precision. On the road, the silent acceleration of an electric motor feels nothing like a gasoline engine. Meanwhile, wind turbines and solar panels are increasingly powering the grid that charges them.`,
+  `Deep in the Amazon rainforest, towering trees rise sixty meters into the sky, their canopies locking together in an unbroken sea of green. Shafts of golden light pierce through the leaves and illuminate the forest floor below, where jaguars stalk silently through the undergrowth. Scarlet macaws burst from the treetops in flashes of red and blue, screeching as they cross the open air above the river.
+
+The Amazon River winds through the jungle like a brown serpent — wide, slow, and teeming with life. Pink river dolphins surface alongside wooden canoes, while fishermen cast nets into the murky water at dawn. Piranhas dart in silver schools beneath the surface, visible only when the sun catches their scales just right.
+
+But this magnificent world is shrinking. Satellite footage shows vast corridors of forest reduced to smoldering ash, cleared for cattle ranches and soybean fields. Bulldozers tear through ancient trees while plumes of smoke rise into the sky and drift across entire states. Indigenous communities stand at the edge of cleared land, watching the horizon where their forest once stood.
+
+Conservation teams trek through the remaining jungle, tagging wildlife and planting seedlings in cleared patches. Camera traps capture rare footage of tapirs, giant anteaters, and ocelots navigating a landscape cut apart by dirt roads. The race to protect what remains is happening in real time — every hectare saved a small victory against a relentless tide.`,
+
+  `The starting gun fires and dozens of electric motorcycles launch off the line simultaneously, their silence broken only by the whine of motors and the screech of tires on asphalt. Riders lean hard into the first hairpin corner, knee sliders grazing the track as they thread through at over 150 miles per hour.
+
+In the pit lane, mechanics crouch over exposed battery packs, swapping modules with practiced precision. Holographic displays on the pit wall show live telemetry — temperature gradients across the battery cells, torque curves, regenerative braking data scrolling in green numbers on black screens.
+
+Off the track, the technology is reshaping everyday streets. Charging stations glow in the predawn light of highway rest stops, rows of cables snaking into cars parked under LED canopies. Inside a gigafactory, robotic arms weld battery casings in showers of sparks while autonomous forklifts ferry components across a floor the size of several city blocks.
+
+Wind farms stretch across ridge lines at sunset, their blades spinning slowly against an orange sky, feeding power into the grid that will charge tomorrow's morning commute. On a coastal road, a single electric sedan moves silently past crashing waves — no exhaust, no noise, just the hiss of tires on wet pavement and the open road ahead.`,
 ]
 
 export default function ScriptInput() {
@@ -74,7 +87,6 @@ export default function ScriptInput() {
       const reader = analyzeRes.body.getReader()
       const decoder = new TextDecoder()
       let buffer = ''
-      let totalSegments = 0
 
       while (true) {
         const { done, value } = await reader.read()
@@ -104,13 +116,8 @@ export default function ScriptInput() {
           }
           if (parsed.segments) {
             addSegments(parsed.segments)
-            totalSegments += parsed.segments.length
           }
         }
-      }
-
-      if (totalSegments === 0) {
-        throw new Error('No segments were identified — the AI may be busy. Please try again.')
       }
 
       setIsAnalyzing(false)
