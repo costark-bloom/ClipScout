@@ -10,14 +10,10 @@ export const maxDuration = 60
 
 export async function POST(request: NextRequest) {
   const session = await getServerSession(authOptions)
-  if (!session?.user?.email) {
-    return new Response(JSON.stringify({ error: 'You must be signed in to analyze a script.' }), {
-      status: 401,
-      headers: { 'Content-Type': 'application/json' },
-    })
-  }
+  // Allow unauthenticated users through — the results page handles the sign-in gate.
+  // Credits are only checked/deducted for signed-in users.
+  const userEmail = session?.user?.email ?? null
 
-  const userEmail = session.user.email
   const body = await request.json()
   const { script, chunkIndex, segmentIdOffset = 0, scriptContext: providedContext } = body
 
@@ -35,12 +31,15 @@ export async function POST(request: NextRequest) {
     })
   }
 
-  const creditsRemaining = await getCreditsRemaining(userEmail)
-  if (creditsRemaining < 1) {
-    return new Response(JSON.stringify({ error: 'INSUFFICIENT_CREDITS' }), {
-      status: 402,
-      headers: { 'Content-Type': 'application/json' },
-    })
+  // Only enforce credit limits for authenticated users
+  if (userEmail) {
+    const creditsRemaining = await getCreditsRemaining(userEmail)
+    if (creditsRemaining < 1) {
+      return new Response(JSON.stringify({ error: 'INSUFFICIENT_CREDITS' }), {
+        status: 402,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    }
   }
 
   const trimmed = script.trim()
@@ -76,8 +75,10 @@ export async function POST(request: NextRequest) {
             id: `seg_${++segmentCounter}`,
           }))
 
-          await deductCredit(userEmail)
-          console.log(`[credits] deducted 1 credit for ${userEmail} (chunk ${chunkIndex + 1})`)
+          if (userEmail) {
+            await deductCredit(userEmail)
+            console.log(`[credits] deducted 1 credit for ${userEmail} (chunk ${chunkIndex + 1})`)
+          }
 
           if (validated.length > 0) {
             controller.enqueue(
@@ -124,8 +125,10 @@ export async function POST(request: NextRequest) {
           id: `seg_${++segmentCounter}`,
         }))
 
-        await deductCredit(userEmail)
-        console.log(`[credits] deducted 1 credit for ${userEmail} (initial chunk 1)`)
+        if (userEmail) {
+          await deductCredit(userEmail)
+          console.log(`[credits] deducted 1 credit for ${userEmail} (initial chunk 1)`)
+        }
 
         if (validated.length > 0) {
           controller.enqueue(
