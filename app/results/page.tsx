@@ -46,6 +46,7 @@ export default function ResultsPage() {
   const [loadingSegmentIds, setLoadingSegmentIds] = useState<Set<string>>(new Set())
   const [loadingChapterInScript, setLoadingChapterInScript] = useState<number | null>(null)
   const [showLoadChapterHint, setShowLoadChapterHint] = useState(false)
+  const [scriptDrawerOpen, setScriptDrawerOpen] = useState(false)
   // Track if the user has a paid plan (for upgrade modal messaging)
   const [isFreeTrial, setIsFreeTrial] = useState(true)
 
@@ -483,7 +484,68 @@ export default function ResultsPage() {
         </div>
       )}
 
-      <div className="flex flex-1 overflow-hidden" style={{ height: 'calc(100vh - 40px)' }}>
+      {/* Mobile script drawer — slides up from bottom */}
+      {scriptDrawerOpen && (
+        <div className="md:hidden fixed inset-0 z-40 flex flex-col justify-end">
+          {/* Backdrop */}
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setScriptDrawerOpen(false)} />
+          {/* Drawer */}
+          <div className="relative bg-white/95 backdrop-blur-sm rounded-t-2xl border-t border-purple-200 shadow-2xl flex flex-col" style={{ maxHeight: '75dvh' }}>
+            <div className="px-5 py-4 border-b border-purple-200 shrink-0 flex items-center justify-between">
+              <div>
+                <span className="text-[10px] uppercase tracking-widest text-purple-500 font-semibold">Your script</span>
+                {segments.length > 0 && (
+                  <div className="text-xs font-semibold text-purple-800 mt-0.5">
+                    {segments.length} segments · {allChapters.length} chapter{allChapters.length !== 1 ? 's' : ''}
+                  </div>
+                )}
+              </div>
+              <div className="flex items-center gap-3">
+                <button onClick={handleStartOver} className="text-[11px] text-purple-500 hover:text-purple-800 transition-colors">Start over</button>
+                <button onClick={() => setScriptDrawerOpen(false)} className="p-1.5 rounded-lg hover:bg-purple-100 text-purple-500 transition-colors">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+            <div ref={scriptPanelRef} className="flex-1 overflow-y-auto px-5 py-4">
+              {script ? (
+                <InteractiveScript
+                  script={script}
+                  segments={segments}
+                  containerRef={scriptPanelRef}
+                  onAddSegment={handleAddSegment}
+                  chunkOffsets={scriptChunkOffsets}
+                  totalChapters={scriptChunkCount}
+                  analyzedChapters={analyzedChapters}
+                  onLoadChapter={handleLoadChapterFromScript}
+                  loadingChapter={loadingChapterInScript}
+                  showHint={false}
+                />
+              ) : null}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Mobile floating action buttons */}
+      {segments.length > 0 && !scriptDrawerOpen && (
+        <div className="md:hidden fixed bottom-5 right-4 z-30 flex flex-col gap-2 items-end">
+          <button
+            onClick={() => setScriptDrawerOpen(true)}
+            className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold px-4 py-2.5 rounded-full shadow-lg shadow-purple-900/30 transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
+            </svg>
+            View script
+          </button>
+        </div>
+      )}
+
+      {/* Use dvh instead of vh to handle iOS Safari toolbar correctly */}
+      <div className="flex flex-1 overflow-hidden" style={{ height: 'calc(100dvh - 40px)' }}>
         {/* LEFT PANEL */}
         <div className="hidden md:flex flex-col w-[30%] min-w-[280px] max-w-sm border-r border-purple-200 overflow-hidden bg-white/20 backdrop-blur-sm">
           <div className="px-5 py-4 border-b border-purple-200 shrink-0">
