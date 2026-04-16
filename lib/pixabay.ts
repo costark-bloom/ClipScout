@@ -44,40 +44,69 @@ export async function searchPixabay(query: string, perPage = 5): Promise<VideoRe
   const data: PixabayResponse = await res.json()
   if (!data.hits) return []
 
-  return data.hits.map((hit) => {
-    const embedUrl =
-      hit.videos.medium?.url ||
-      hit.videos.large?.url ||
-      hit.videos.small?.url ||
-      hit.videos.tiny?.url
-
-    const thumbnailUrl = `https://i.vimeocdn.com/video/${hit.picture_id}_640x360.jpg`
-
-    const minutes = Math.floor(hit.duration / 60)
-    const seconds = hit.duration % 60
-    const duration = `${minutes}:${String(seconds).padStart(2, '0')}`
-
-    const startTimestamp = hit.duration > 10 ? Math.min(Math.round(hit.duration * 0.1), 3) : 0
-
-    const tagList = hit.tags
-      ? hit.tags.split(',').map((t: string) => t.trim()).filter(Boolean)
-      : []
-
-    return {
-      id: `pbay_${hit.id}`,
-      title: tagList.length > 0
-        ? `${tagList[0]} — Pixabay`
-        : `Pixabay Video #${hit.id}`,
-      thumbnailUrl,
-      sourceUrl: hit.pageURL,
-      embedUrl,
-      platform: 'pixabay' as const,
-      license: 'royalty-free' as const,
-      duration,
-      durationSeconds: hit.duration,
-      channelOrAuthor: hit.user,
-      startTimestamp,
-      tags: tagList,
+  // Resolve the best available thumbnail URL for a Pixabay hit.
+  // Vimeo CDN hosts the thumbnails — try the 640x360 variant first, then fall back to 295x166.
+  async function resolveThumbnail(pictureId: string): Promise<string | null> {
+    const candidates = [
+      `https://i.vimeocdn.com/video/${pictureId}_640x360.jpg`,
+      `https://i.vimeocdn.com/video/${pictureId}_295x166.jpg`,
+    ]
+    for (const url of candidates) {
+      try {
+        const res = await Promise.race([
+          fetch(url, { method: 'HEAD' }),
+          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 1500)),
+        ])
+        if (res.ok) return url
+      } catch {
+        // try next candidate
+      }
     }
-  })
+    return null
+  }
+
+  // Resolve thumbnails in parallel, then filter out hits with no valid thumbnail
+  const resolved = await Promise.all(
+    data.hits.map(async (hit) => ({
+      hit,
+      thumbnailUrl: await resolveThumbnail(hit.picture_id),
+    }))
+  )
+
+  return resolved
+    .filter(({ thumbnailUrl }) => thumbnailUrl !== null)
+    .map(({ hit, thumbnailUrl }) => {
+      const embedUrl =
+        hit.videos.medium?.url ||
+        hit.videos.large?.url ||
+        hit.videos.small?.url ||
+        hit.videos.tiny?.url
+
+      const minutes = Math.floor(hit.duration / 60)
+      const seconds = hit.duration % 60
+      const duration = `${minutes}:${String(seconds).padStart(2, '0')}`
+
+      const startTimestamp = hit.duration > 10 ? Math.min(Math.round(hit.duration * 0.1), 3) : 0
+
+      const tagList = hit.tags
+        ? hit.tags.split(',').map((t: string) => t.trim()).filter(Boolean)
+        : []
+
+      return {
+        id: `pbay_${hit.id}`,
+        title: tagList.length > 0
+          ? `${tagList[0]} — Pixabay`
+          : `Pixabay Video #${hit.id}`,
+        thumbnailUrl: thumbnailUrl!,
+        sourceUrl: hit.pageURL,
+        embedUrl,
+        platform: 'pixabay' as const,
+        license: 'royalty-free' as const,
+        duration,
+        durationSeconds: hit.duration,
+        channelOrAuthor: hit.user,
+        startTimestamp,
+        tags: tagList,
+      }
+    })
 }
