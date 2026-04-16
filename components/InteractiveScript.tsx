@@ -75,9 +75,11 @@ export default function InteractiveScript({
   const [popover, setPopover] = useState<SelectionPopover | null>(null)
   const [hintPos, setHintPos] = useState<{ top: number; left: number } | null>(null)
 
-  // Position the hint tooltip over the first plain-text (unsegmented) span
+  // Position the hint tooltip over the first plain-text (unsegmented) span.
+  // Skip on mobile — the script panel is hidden there so the tooltip has nowhere to anchor.
   useEffect(() => {
     if (!showHint || !scriptRef.current) { setHintPos(null); return }
+    if (window.innerWidth < 768) { setHintPos(null); return }
     const el = scriptRef.current.querySelector<HTMLElement>('[data-text-start]')
     if (!el) { setHintPos(null); return }
 
