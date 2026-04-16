@@ -59,7 +59,7 @@ async function fetchTranscript(videoId: string): Promise<TranscriptLine[] | null
         headers: { 'x-api-key': apiKey },
       }),
       new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('timeout')), 2000)
+        setTimeout(() => reject(new Error('timeout')), 4000)
       ),
     ])
 
@@ -147,17 +147,24 @@ export async function enrichWithTranscripts(
 ): Promise<VideoResult[]> {
   if (youtubeResults.length === 0) return []
 
-  // Fetch all transcripts in parallel — timeouts are short (2s) so sequential batching
-  // just multiplies the wait time when most videos don't have accessible transcripts.
-  // Cap at 10 videos to avoid excessive Supadata quota usage.
-  const candidates = youtubeResults.slice(0, 10)
-  const transcriptResults = await Promise.all(
-    candidates.map(async (video) => {
-      const rawId = video.id.replace('yt_', '')
-      const lines = await fetchTranscript(rawId)
-      return { video, videoId: rawId, lines }
-    })
-  )
+  // Fetch transcripts 3 at a time — safe under 10 req/sec Supadata plan
+  const transcriptResults: { video: VideoResult; videoId: string; lines: TranscriptLine[] | null }[] = []
+  const BATCH_SIZE = 3
+  for (let i = 0; i < youtubeResults.length; i += BATCH_SIZE) {
+    const batch = youtubeResults.slice(i, i + BATCH_SIZE)
+    const batchResults = await Promise.all(
+      batch.map(async (video) => {
+        const rawId = video.id.replace('yt_', '')
+        const lines = await fetchTranscript(rawId)
+        return { video, videoId: rawId, lines }
+      })
+    )
+    transcriptResults.push(...batchResults)
+    // Small delay between batches to stay safely under rate limit
+    if (i + BATCH_SIZE < youtubeResults.length) {
+      await new Promise((r) => setTimeout(r, 150))
+    }
+  }
 
   const withTranscripts: VideoTranscript[] = transcriptResults
     .filter((r) => r.lines !== null && r.lines!.length > 0)
@@ -199,9 +206,8 @@ export async function enrichWithTranscripts(
       }
     })
 
-  // Sort by relevance score descending, then append videos without transcripts or beyond the cap
-  const uncapped = youtubeResults.slice(10)
+  // Sort by relevance score descending, then append videos without transcripts
   const sorted = enriched.sort((a, b) => (b.relevanceScore ?? 0) - (a.relevanceScore ?? 0))
 
-  return [...sorted, ...withoutTranscripts, ...uncapped]
+  return [...sorted, ...withoutTranscripts]
 }
