@@ -1,9 +1,20 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+
+const SESSION_KEY = 'clipscout_disclaimer_dismissed'
 
 export default function DisclaimerBanner() {
-  const [dismissed, setDismissed] = useState(false)
+  const [dismissed, setDismissed] = useState(true) // start hidden to avoid flash
+
+  useEffect(() => {
+    setDismissed(sessionStorage.getItem(SESSION_KEY) === '1')
+  }, [])
+
+  const handleDismiss = () => {
+    sessionStorage.setItem(SESSION_KEY, '1')
+    setDismissed(true)
+  }
 
   if (dismissed) return null
 
@@ -30,7 +41,7 @@ export default function DisclaimerBanner() {
         Service. Pexels and Pixabay videos are generally royalty-free — check individual licenses.
       </span>
       <button
-        onClick={() => setDismissed(true)}
+        onClick={handleDismiss}
         className="shrink-0 text-amber-500 hover:text-amber-700 transition-colors ml-2"
         aria-label="Dismiss disclaimer"
       >
