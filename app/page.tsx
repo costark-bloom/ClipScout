@@ -114,7 +114,7 @@ export default function HomePage() {
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-lg bg-purple-100 border border-purple-200 flex items-center justify-center">
                     <svg
-                      className="w-4.5 h-4.5 text-purple-600"
+                      className="w-5 h-5 text-purple-600"
                       fill="none"
                       viewBox="0 0 24 24"
                       stroke="currentColor"
