@@ -141,7 +141,7 @@ export default function ScriptInput() {
           onChange={(e) => setLocalScript(e.target.value)}
           placeholder="Paste your video script here…
 
-The app will identify every visually descriptive moment — like 'towering skyscrapers reflect the morning sun' or 'children playing in a park' — and find matching B-roll footage from YouTube, Pexels, and Pixabay."
+The app will identify every visually descriptive moment — like 'towering skyscrapers reflect the morning sun' or 'children playing in a park' — and find matching B-roll footage automatically."
           rows={14}
           className="w-full bg-white/60 border border-purple-200 text-purple-950 placeholder-purple-400 rounded-xl px-5 py-4 text-sm leading-relaxed resize-none focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-transparent transition-all duration-200 font-mono backdrop-blur-sm"
           onKeyDown={(e) => {

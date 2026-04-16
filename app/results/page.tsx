@@ -622,7 +622,7 @@ export default function ResultsPage() {
                 </p>
                 {isLoading && (
                   <p className="text-[10px] text-purple-500">
-                    {isAnalyzing ? 'AI is reading your script…' : 'Searching YouTube, Pexels & Pixabay…'}
+                    {isAnalyzing ? 'AI is reading your script…' : 'Finding footage…'}
                   </p>
                 )}
               </div>

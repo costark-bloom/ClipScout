@@ -34,8 +34,8 @@ export default function LoadingState({ stage, progress, segmentCount }: LoadingS
             {stage === 'analyzing'
               ? 'AI is identifying visual moments and generating search queries.'
               : segmentCount
-              ? `Searching YouTube, Pexels & Pixabay for ${segmentCount} segment${segmentCount !== 1 ? 's' : ''}…`
-              : 'Searching YouTube, Pexels & Pixabay…'}
+              ? `Finding footage for ${segmentCount} segment${segmentCount !== 1 ? 's' : ''}…`
+              : 'Finding footage…'}
           </p>
         </div>
 
