@@ -34,6 +34,24 @@ export default function RootLayout({
           <div className="flex-1">{children}</div>
           <Footer />
         </SessionProvider>
+        {/* Google Ads tag */}
+        <Script
+          src="https://www.googletagmanager.com/gtag/js?id=AW-18107713725"
+          strategy="afterInteractive"
+        />
+        <Script
+          id="google-ads-init"
+          strategy="afterInteractive"
+          dangerouslySetInnerHTML={{
+            __html: `
+              window.dataLayer = window.dataLayer || [];
+              function gtag(){dataLayer.push(arguments);}
+              gtag('js', new Date());
+              gtag('config', 'AW-18107713725');
+            `,
+          }}
+        />
+
         <Script
           id="mixpanel-init"
           strategy="afterInteractive"
