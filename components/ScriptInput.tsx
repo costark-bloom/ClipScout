@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import useAppStore from '@/store/useAppStore'
 import UpgradeModal from '@/components/UpgradeModal'
 import { splitIntoChunks } from '@/lib/chunks'
+import type { VideoOrientation } from '@/lib/types'
 
 const EXAMPLE_SCRIPTS = [
   `Deep in the Amazon rainforest, towering trees rise sixty meters into the sky, their canopies locking together in an unbroken sea of green. Shafts of golden light pierce through the leaves and illuminate the forest floor below, where jaguars stalk silently through the undergrowth. Scarlet macaws burst from the treetops in flashes of red and blue, screeching as they cross the open air above the river.
@@ -30,6 +31,7 @@ export default function ScriptInput() {
     setScript, addSegments, setIsAnalyzing, setError, reset,
     showUpgradeModal, setShowUpgradeModal,
     setScriptChunks, setSavedScriptContext,
+    videoOrientation, setVideoOrientation,
   } = useAppStore()
   const [localScript, setLocalScript] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -152,6 +154,32 @@ The app will identify every visually descriptive moment — like 'towering skysc
           <span className="text-xs text-purple-400">
             {wordCount > 0 && `${wordCount.toLocaleString()} words · ${charCount.toLocaleString()} chars`}
           </span>
+        </div>
+      </div>
+
+      {/* Orientation filter */}
+      <div className="flex items-center gap-3">
+        <span className="text-xs font-semibold text-purple-600 shrink-0">Video format</span>
+        <div className="flex items-center gap-1.5 bg-white/50 border border-purple-200 rounded-xl p-1">
+          {([
+            { value: 'both',       label: 'Both',       icon: '▣' },
+            { value: 'horizontal', label: 'Horizontal', icon: '▬' },
+            { value: 'vertical',   label: 'Vertical',   icon: '▮' },
+          ] as { value: VideoOrientation; label: string; icon: string }[]).map(({ value, label, icon }) => (
+            <button
+              key={value}
+              onClick={() => setVideoOrientation(value)}
+              className={[
+                'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150',
+                videoOrientation === value
+                  ? 'bg-purple-600 text-white shadow-sm'
+                  : 'text-purple-600 hover:bg-purple-100',
+              ].join(' ')}
+            >
+              <span className="text-[10px] leading-none">{icon}</span>
+              {label}
+            </button>
+          ))}
         </div>
       </div>
 

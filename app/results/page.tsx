@@ -41,6 +41,7 @@ export default function ResultsPage() {
     scriptChunkCount,
     savedScriptContext,
     setSavedScriptContext,
+    videoOrientation,
   } = useAppStore()
 
   const [loadingSegmentIds, setLoadingSegmentIds] = useState<Set<string>>(new Set())
@@ -119,6 +120,10 @@ export default function ResultsPage() {
 
   // Set of chapter numbers that have been analyzed (i.e. have segments in the store)
   const analyzedChapters = new Set(segments.map((s) => s.chapter ?? 1))
+  // During analysis, pretend all chapters are visible so the full script renders as plain text
+  const analyzedChaptersForPanel = isAnalyzing
+    ? new Set(Array.from({ length: Math.max(scriptChunkCount, 1) }, (_, i) => i + 1))
+    : analyzedChapters
 
   // Drive progress bar: 0-50% while analyzing, 50-95% while searching, 100% when done
   useEffect(() => {
@@ -174,7 +179,7 @@ export default function ResultsPage() {
         const res = await fetch('/api/search', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ segments: chapterSegments }),
+          body: JSON.stringify({ segments: chapterSegments, orientation: videoOrientation }),
         })
 
         if (!res.ok) {
@@ -304,7 +309,7 @@ export default function ResultsPage() {
           const searchRes = await fetch('/api/search', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ segments: newSegments }),
+            body: JSON.stringify({ segments: newSegments, orientation: videoOrientation }),
           })
           if (searchRes.ok) {
             const { results } = await searchRes.json()
@@ -392,6 +397,7 @@ export default function ResultsPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             segments: [{ ...placeholder, topic, searchQueries }],
+            orientation: videoOrientation,
           }),
         })
         if (searchRes.ok) {
@@ -518,8 +524,8 @@ export default function ResultsPage() {
                   onAddSegment={handleAddSegment}
                   chunkOffsets={scriptChunkOffsets}
                   totalChapters={scriptChunkCount}
-                  analyzedChapters={analyzedChapters}
-                  onLoadChapter={handleLoadChapterFromScript}
+                  analyzedChapters={analyzedChaptersForPanel}
+                  onLoadChapter={isAnalyzing ? undefined : handleLoadChapterFromScript}
                   loadingChapter={loadingChapterInScript}
                   showHint={false}
                 />
@@ -572,8 +578,8 @@ export default function ResultsPage() {
                 onAddSegment={handleAddSegment}
                 chunkOffsets={scriptChunkOffsets}
                 totalChapters={scriptChunkCount}
-                analyzedChapters={analyzedChapters}
-                onLoadChapter={handleLoadChapterFromScript}
+                analyzedChapters={analyzedChaptersForPanel}
+                onLoadChapter={isAnalyzing ? undefined : handleLoadChapterFromScript}
                 loadingChapter={loadingChapterInScript}
                 showHint={showLoadChapterHint}
                 onDismissHint={() => setShowLoadChapterHint(false)}

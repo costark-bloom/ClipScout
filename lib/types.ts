@@ -35,6 +35,8 @@ export interface SearchResults {
 
 export type ChapterStatus = 'idle' | 'loading' | 'done'
 
+export type VideoOrientation = 'both' | 'horizontal' | 'vertical'
+
 export interface AppState {
   script: string
   segments: ScriptSegment[]
@@ -44,6 +46,8 @@ export interface AppState {
   isSearching: boolean
   chapterStatus: Record<number, ChapterStatus>
   error: string | null
+  videoOrientation: VideoOrientation
+  setVideoOrientation: (orientation: VideoOrientation) => void
   setScript: (script: string) => void
   setSegments: (segments: ScriptSegment[]) => void
   addSegments: (segments: ScriptSegment[]) => void

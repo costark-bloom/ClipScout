@@ -9,7 +9,7 @@ import { enrichWithTranscripts } from '@/lib/transcript-matcher'
 import { enrichWithMetadata } from '@/lib/metadata-matcher'
 import { generateFallbackQueries } from '@/lib/claude'
 import { supabase } from '@/lib/supabase'
-import type { ScriptSegment, SearchResults, VideoResult } from '@/lib/types'
+import type { ScriptSegment, SearchResults, VideoResult, VideoOrientation } from '@/lib/types'
 
 const MAX_PER_SOURCE = 4
 const MAX_PER_SEGMENT = 12
@@ -25,14 +25,17 @@ function deduplicateByUrl(videos: VideoResult[]): VideoResult[] {
 
 async function searchForSegment(
   segment: ScriptSegment,
-  freepikApiKey?: string
+  freepikApiKey?: string,
+  orientation: VideoOrientation = 'both'
 ): Promise<SearchResults> {
   const queries = segment.searchQueries.slice(0, 3)
 
-  // Run all queries across all platforms concurrently
+  // Run all queries across all platforms concurrently.
+  // For vertical mode, request more Pixabay results to compensate for its sparse portrait library.
+  const pixabayPerPage = orientation === 'vertical' ? 12 : 5
   const allPromises = queries.flatMap((query) => [
-    searchPexels(query, 5).catch(() => [] as VideoResult[]),
-    searchPixabay(query, 5).catch(() => [] as VideoResult[]),
+    searchPexels(query, 5, orientation).catch(() => [] as VideoResult[]),
+    searchPixabay(query, pixabayPerPage, orientation).catch(() => [] as VideoResult[]),
     searchYouTube(query, 5).catch(() => [] as VideoResult[]),
     freepikApiKey
       ? searchFreepik(query, freepikApiKey, 5).catch(() => [] as VideoResult[])
@@ -99,8 +102,8 @@ async function searchForSegment(
 
     if (fallbackQueries.length > 0) {
       const fallbackPromises = fallbackQueries.flatMap((query) => [
-        searchPexels(query, 5).catch(() => [] as VideoResult[]),
-        searchPixabay(query, 5).catch(() => [] as VideoResult[]),
+        searchPexels(query, 5, orientation).catch(() => [] as VideoResult[]),
+        searchPixabay(query, pixabayPerPage, orientation).catch(() => [] as VideoResult[]),
         freepikApiKey
           ? searchFreepik(query, freepikApiKey, 5).catch(() => [] as VideoResult[])
           : Promise.resolve([] as VideoResult[]),
@@ -154,7 +157,7 @@ export const maxDuration = 120 // allow up to 2 minutes for large scripts
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { segments } = body
+    const { segments, orientation = 'both' } = body as { segments: unknown; orientation?: VideoOrientation }
 
     if (!Array.isArray(segments)) {
       return NextResponse.json({ error: 'segments array is required' }, { status: 400 })
@@ -187,7 +190,7 @@ export async function POST(request: NextRequest) {
     const results = await withConcurrencyLimit(
       segments as ScriptSegment[],
       2,
-      (segment) => searchForSegment(segment, freepikApiKey)
+      (segment) => searchForSegment(segment, freepikApiKey, orientation)
     )
 
     return NextResponse.json({ results })

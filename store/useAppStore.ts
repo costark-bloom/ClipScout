@@ -2,7 +2,7 @@
 
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
-import type { AppState, ChapterStatus, ScriptSegment, SearchResults } from '@/lib/types'
+import type { AppState, ChapterStatus, ScriptSegment, SearchResults, VideoOrientation } from '@/lib/types'
 
 interface AppStateWithHydration extends AppState {
   _hasHydrated: boolean
@@ -10,7 +10,6 @@ interface AppStateWithHydration extends AppState {
   setHasHydrated: (value: boolean) => void
   setShowUpgradeModal: (value: boolean) => void
 }
-
 const useAppStore = create<AppStateWithHydration>()(
   persist(
     (set) => ({
@@ -27,9 +26,11 @@ const useAppStore = create<AppStateWithHydration>()(
       scriptChunkOffsets: [],
       scriptChunkCount: 1,
       savedScriptContext: '',
+      videoOrientation: 'both' as VideoOrientation,
 
       setHasHydrated: (value: boolean) => set({ _hasHydrated: value }),
       setShowUpgradeModal: (value: boolean) => set({ showUpgradeModal: value }),
+      setVideoOrientation: (orientation: VideoOrientation) => set({ videoOrientation: orientation }),
       setScriptChunks: (offsets: number[], count: number) =>
         set({ scriptChunkOffsets: offsets, scriptChunkCount: count }),
       setSavedScriptContext: (ctx: string) => set({ savedScriptContext: ctx }),
@@ -90,6 +91,7 @@ const useAppStore = create<AppStateWithHydration>()(
         scriptChunkOffsets: state.scriptChunkOffsets,
         scriptChunkCount: state.scriptChunkCount,
         savedScriptContext: state.savedScriptContext,
+        videoOrientation: state.videoOrientation,
       }),
       onRehydrateStorage: () => (state) => {
         state?.setHasHydrated(true)

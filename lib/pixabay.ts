@@ -1,4 +1,4 @@
-import type { VideoResult } from './types'
+import type { VideoResult, VideoOrientation } from './types'
 
 interface PixabayVideoSizes {
   large?: { url: string; width: number; height: number; size: number }
@@ -21,7 +21,7 @@ interface PixabayResponse {
   hits: PixabayHit[]
 }
 
-export async function searchPixabay(query: string, perPage = 5): Promise<VideoResult[]> {
+export async function searchPixabay(query: string, perPage = 5, orientation: VideoOrientation = 'both'): Promise<VideoResult[]> {
   const apiKey = process.env.PIXABAY_API_KEY
   if (!apiKey) {
     console.warn('PIXABAY_API_KEY not set, skipping Pixabay search')
@@ -74,7 +74,23 @@ export async function searchPixabay(query: string, perPage = 5): Promise<VideoRe
   )
 
   return resolved
-    .filter(({ thumbnailUrl }) => thumbnailUrl !== null)
+    .filter(({ thumbnailUrl, hit }) => {
+      if (thumbnailUrl === null) return false
+      // Filter by orientation using medium (or largest available) video dimensions
+      if (orientation !== 'both') {
+        const dims =
+          hit.videos.medium ??
+          hit.videos.large ??
+          hit.videos.small ??
+          hit.videos.tiny
+        if (dims) {
+          const isPortrait = dims.height > dims.width
+          if (orientation === 'vertical' && !isPortrait) return false
+          if (orientation === 'horizontal' && isPortrait) return false
+        }
+      }
+      return true
+    })
     .map(({ hit, thumbnailUrl }) => {
       const embedUrl =
         hit.videos.medium?.url ||

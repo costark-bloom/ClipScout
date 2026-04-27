@@ -1,4 +1,4 @@
-import type { VideoResult } from './types'
+import type { VideoResult, VideoOrientation } from './types'
 
 interface PexelsVideoFile {
   quality: string
@@ -19,7 +19,7 @@ interface PexelsResponse {
   videos: PexelsVideo[]
 }
 
-export async function searchPexels(query: string, perPage = 5): Promise<VideoResult[]> {
+export async function searchPexels(query: string, perPage = 5, orientation: VideoOrientation = 'both'): Promise<VideoResult[]> {
   const apiKey = process.env.PEXELS_API_KEY
   if (!apiKey) {
     console.warn('PEXELS_API_KEY not set, skipping Pexels search')
@@ -30,6 +30,9 @@ export async function searchPexels(query: string, perPage = 5): Promise<VideoRes
     query,
     per_page: String(perPage),
   })
+  // Pexels supports orientation natively for videos
+  if (orientation === 'horizontal') params.set('orientation', 'landscape')
+  else if (orientation === 'vertical') params.set('orientation', 'portrait')
 
   const res = await fetch(`https://api.pexels.com/videos/search?${params}`, {
     headers: { Authorization: apiKey },
