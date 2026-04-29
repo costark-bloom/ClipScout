@@ -2,6 +2,7 @@
 
 import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 import useAppStore from '@/store/useAppStore'
 import UpgradeModal from '@/components/UpgradeModal'
 import { splitIntoChunks } from '@/lib/chunks'
@@ -27,6 +28,8 @@ Wind farms stretch across ridge lines at sunset, their blades spinning slowly ag
 
 export default function ScriptInput() {
   const router = useRouter()
+  const { data: session, status: authStatus } = useSession()
+  const isGuest = authStatus !== 'loading' && !session
   const {
     setScript, addSegments, setIsAnalyzing, setError, reset,
     showUpgradeModal, setShowUpgradeModal,
@@ -35,7 +38,10 @@ export default function ScriptInput() {
   } = useAppStore()
   const [localScript, setLocalScript] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [tooltipDismissed, setTooltipDismissed] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  const showExampleTooltip = isGuest && !tooltipDismissed && !localScript
 
   const wordCount = localScript.trim() ? localScript.trim().split(/\s+/).length : 0
   const charCount = localScript.length
@@ -43,6 +49,7 @@ export default function ScriptInput() {
   const handleExample = () => {
     const example = EXAMPLE_SCRIPTS[Math.floor(Math.random() * EXAMPLE_SCRIPTS.length)]
     setLocalScript(example)
+    setTooltipDismissed(true)
     textareaRef.current?.focus()
   }
 
@@ -208,12 +215,25 @@ The app will identify every visually descriptive moment — like 'towering skysc
           )}
         </button>
 
-        <button
-          onClick={handleExample}
-          className="px-4 py-3 rounded-xl border border-purple-200 text-purple-600 hover:text-purple-900 hover:border-purple-400 text-sm transition-all duration-200 bg-white/40"
-        >
-          Try an example
-        </button>
+        <div className="relative">
+          {showExampleTooltip && (
+            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 animate-bounce-subtle pointer-events-none z-10">
+              <div className="bg-purple-700 text-white text-xs font-semibold px-3 py-2 rounded-lg shadow-lg shadow-purple-900/30 whitespace-nowrap">
+                Click to test with an example script
+              </div>
+              {/* Arrow pointing down */}
+              <div className="flex justify-center">
+                <div className="w-0 h-0 border-l-[6px] border-r-[6px] border-t-[6px] border-l-transparent border-r-transparent border-t-purple-700" />
+              </div>
+            </div>
+          )}
+          <button
+            onClick={handleExample}
+            className="px-4 py-3 rounded-xl border border-purple-200 text-purple-600 hover:text-purple-900 hover:border-purple-400 text-sm transition-all duration-200 bg-white/40"
+          >
+            Try an example
+          </button>
+        </div>
       </div>
     </div>
     </>

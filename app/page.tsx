@@ -1,6 +1,7 @@
 import ScriptInput from '@/components/ScriptInput'
 import DisclaimerBanner from '@/components/DisclaimerBanner'
 import HomeHeader from '@/components/HomeHeader'
+import FreeTrialBadge from '@/components/FreeTrialBadge'
 
 export default function HomePage() {
   return (
@@ -32,7 +33,7 @@ export default function HomePage() {
 
       <main className="relative flex-1 flex flex-col items-center justify-center px-4 py-16" style={{zIndex:1}}>
         {/* Logo / Hero */}
-        <div className="text-center mb-12 space-y-4 animate-fade-in">
+        <div className="text-center mb-8 space-y-4 animate-fade-in">
           <div className="flex flex-col items-center gap-4 mb-2">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/icon.svg" alt="ClipScout" className="w-16 h-16" />
@@ -54,6 +55,9 @@ export default function HomePage() {
           </p>
 
         </div>
+
+        {/* Free trial badge — guests only */}
+        <FreeTrialBadge />
 
         {/* Script Input */}
         <div className="w-full max-w-3xl animate-slide-up">
