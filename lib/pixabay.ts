@@ -44,38 +44,8 @@ export async function searchPixabay(query: string, perPage = 5, orientation: Vid
   const data: PixabayResponse = await res.json()
   if (!data.hits) return []
 
-  // Resolve the best available thumbnail URL for a Pixabay hit.
-  // Vimeo CDN hosts the thumbnails — try the 640x360 variant first, then fall back to 295x166.
-  async function resolveThumbnail(pictureId: string): Promise<string | null> {
-    const candidates = [
-      `https://i.vimeocdn.com/video/${pictureId}_640x360.jpg`,
-      `https://i.vimeocdn.com/video/${pictureId}_295x166.jpg`,
-    ]
-    for (const url of candidates) {
-      try {
-        const res = await Promise.race([
-          fetch(url, { method: 'HEAD' }),
-          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 1500)),
-        ])
-        if (res.ok) return url
-      } catch {
-        // try next candidate
-      }
-    }
-    return null
-  }
-
-  // Resolve thumbnails in parallel, then filter out hits with no valid thumbnail
-  const resolved = await Promise.all(
-    data.hits.map(async (hit) => ({
-      hit,
-      thumbnailUrl: await resolveThumbnail(hit.picture_id),
-    }))
-  )
-
-  return resolved
-    .filter(({ thumbnailUrl, hit }) => {
-      if (thumbnailUrl === null) return false
+  return data.hits
+    .filter((hit) => {
       // Filter by orientation using medium (or largest available) video dimensions
       if (orientation !== 'both') {
         const dims =
@@ -91,7 +61,9 @@ export async function searchPixabay(query: string, perPage = 5, orientation: Vid
       }
       return true
     })
-    .map(({ hit, thumbnailUrl }) => {
+    .map((hit) => {
+      // Prefer the 640x360 thumbnail; broken images handled client-side via onError
+      const thumbnailUrl = `https://i.vimeocdn.com/video/${hit.picture_id}_640x360.jpg`
       const embedUrl =
         hit.videos.medium?.url ||
         hit.videos.large?.url ||
@@ -113,7 +85,7 @@ export async function searchPixabay(query: string, perPage = 5, orientation: Vid
         title: tagList.length > 0
           ? `${tagList[0]} — Pixabay`
           : `Pixabay Video #${hit.id}`,
-        thumbnailUrl: thumbnailUrl!,
+        thumbnailUrl,
         sourceUrl: hit.pageURL,
         embedUrl,
         platform: 'pixabay' as const,

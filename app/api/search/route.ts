@@ -11,7 +11,7 @@ import { generateFallbackQueries } from '@/lib/claude'
 import { supabase } from '@/lib/supabase'
 import type { ScriptSegment, SearchResults, VideoResult, VideoOrientation } from '@/lib/types'
 
-const MAX_PER_SOURCE = 4
+const MAX_PER_SOURCE = 3
 const MAX_PER_SEGMENT = 12
 
 function deduplicateByUrl(videos: VideoResult[]): VideoResult[] {
@@ -186,10 +186,10 @@ export async function POST(request: NextRequest) {
       // Non-fatal — proceed without Freepik
     }
 
-    // Process max 2 segments concurrently to avoid overwhelming Claude API
+    // Process max 3 segments concurrently
     const results = await withConcurrencyLimit(
       segments as ScriptSegment[],
-      2,
+      3,
       (segment) => searchForSegment(segment, freepikApiKey, orientation)
     )
 
