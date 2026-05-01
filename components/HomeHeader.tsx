@@ -6,6 +6,7 @@ import { useSession } from 'next-auth/react'
 import { usePathname } from 'next/navigation'
 import UserMenu from '@/components/UserMenu'
 import AuthGate from '@/components/AuthGate'
+import { trackEvent } from '@/lib/analytics'
 
 export default function HomeHeader() {
   const { status } = useSession()
@@ -34,6 +35,7 @@ export default function HomeHeader() {
             <Link
               key={href}
               href={href}
+              onClick={() => trackEvent('Nav Click', { label, page: 'Header' })}
               className={`text-sm font-semibold transition-colors pb-0.5 ${
                 pathname === href
                   ? 'text-purple-950 border-b-2 border-purple-600'
@@ -47,7 +49,7 @@ export default function HomeHeader() {
             <UserMenu />
           ) : (
             <button
-              onClick={() => setShowAuth(true)}
+              onClick={() => { trackEvent('Button Click', { button_name: 'Sign In', page: 'Header' }); setShowAuth(true) }}
               className="text-sm text-purple-900 hover:text-purple-950 border border-purple-300 hover:border-purple-500 px-4 py-1.5 rounded-lg transition-all duration-150 bg-white/40"
             >
               Sign in
@@ -94,7 +96,7 @@ export default function HomeHeader() {
             ))}
             {status !== 'authenticated' && (
               <button
-                onClick={() => { setMenuOpen(false); setShowAuth(true) }}
+                onClick={() => { setMenuOpen(false); trackEvent('Button Click', { button_name: 'Sign In', page: 'Header — Mobile' }); setShowAuth(true) }}
                 className="text-sm font-semibold text-purple-700 py-2.5 text-left"
               >
                 Sign in

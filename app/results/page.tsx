@@ -12,6 +12,7 @@ import AuthGate, { useAuthGate } from '@/components/AuthGate'
 import UserMenu from '@/components/UserMenu'
 import UpgradeModal from '@/components/UpgradeModal'
 import type { ScriptSegment } from '@/lib/types'
+import { trackEvent } from '@/lib/analytics'
 
 // Returns sorted unique chapter numbers from segments
 function getChapters(segments: ScriptSegment[]): number[] {
@@ -235,6 +236,7 @@ export default function ResultsPage() {
    */
   const handleLoadChapterFromScript = useCallback(
     async (chapterNum: number) => {
+      trackEvent('Button Click', { button_name: 'Load Chapter', page: 'Results', chapter: chapterNum })
       const chunkIndex = chapterNum - 1
 
       setLoadingChapterInScript(chapterNum)
@@ -325,6 +327,7 @@ export default function ResultsPage() {
   )
 
   const handleStartOver = () => {
+    trackEvent('Button Click', { button_name: 'Start Over', page: 'Results' })
     reset()
     router.push('/')
   }
@@ -333,6 +336,7 @@ export default function ResultsPage() {
 
   const handleSaveScript = async () => {
     if (saveState === 'saving' || saveState === 'saved') return
+    trackEvent('Button Click', { button_name: 'Save Script', page: 'Results' })
     setSaveState('saving')
     const title = script.split(/\s+/).slice(0, 8).join(' ').replace(/[^a-zA-Z0-9 ]/g, '').trim() || 'Untitled script'
     try {
@@ -352,6 +356,7 @@ export default function ResultsPage() {
 
   const handleAddSegment = useCallback(
     async (text: string, startIndex: number, endIndex: number) => {
+      trackEvent('Button Click', { button_name: 'Add Segment', page: 'Results' })
       const id = `manual_${Date.now()}`
 
       // Determine which chapter this position belongs to

@@ -6,6 +6,7 @@ import { useSession } from 'next-auth/react'
 import useAppStore from '@/store/useAppStore'
 import UpgradeModal from '@/components/UpgradeModal'
 import { splitIntoChunks } from '@/lib/chunks'
+import { trackEvent } from '@/lib/analytics'
 import type { VideoOrientation } from '@/lib/types'
 
 const EXAMPLE_SCRIPTS = [
@@ -51,10 +52,18 @@ export default function ScriptInput() {
     setLocalScript(example)
     setTooltipDismissed(true)
     textareaRef.current?.focus()
+    trackEvent('Button Click', { button_name: 'Try an Example', page: 'Home' })
   }
 
   const handleSubmit = async () => {
     if (!localScript.trim() || isSubmitting) return
+
+    trackEvent('Button Click', {
+      button_name: 'Find B-Roll',
+      page: 'Home',
+      word_count: localScript.trim().split(/\s+/).length,
+      video_orientation: videoOrientation,
+    })
 
     const trimmedScript = localScript.trim()
     setIsSubmitting(true)
@@ -175,7 +184,10 @@ The app will identify every visually descriptive moment — like 'towering skysc
           ] as { value: VideoOrientation; label: string; icon: string }[]).map(({ value, label, icon }) => (
             <button
               key={value}
-              onClick={() => setVideoOrientation(value)}
+              onClick={() => {
+                setVideoOrientation(value)
+                trackEvent('Button Click', { button_name: `Video Format — ${label}`, page: 'Home' })
+              }}
               className={[
                 'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150',
                 videoOrientation === value
