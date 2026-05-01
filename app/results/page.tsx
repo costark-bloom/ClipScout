@@ -110,6 +110,7 @@ export default function ResultsPage() {
     if (!chapter1) return
     if (chapterStatus[chapter1] === 'done' && !isAuthenticated) {
       setShowGate(true)
+      trackEvent('Results — Sign In Overlay Shown')
     }
     if (isAuthenticated) setShowGate(false)
   // eslint-disable-next-line react-hooks/exhaustive-deps
