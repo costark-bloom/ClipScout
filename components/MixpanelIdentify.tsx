@@ -41,6 +41,22 @@ export default function MixpanelIdentify() {
     }
   }, [session])
 
+  // Detect Google Ads traffic and register as a super property (runs once on mount)
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const mp = (window as any).mixpanel
+    if (!mp) return
+
+    const params = new URLSearchParams(window.location.search)
+    if (params.has('gad_source')) {
+      const source = 'Google Ad'
+      // register_once so first-touch attribution is preserved across the session
+      mp.register_once({ referrer_source: source })
+      mp.people.set_once({ first_referrer_source: source })
+    }
+  }, [])
+
   // Track named page views on every route change
   useEffect(() => {
     if (typeof window === 'undefined') return
