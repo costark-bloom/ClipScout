@@ -35,7 +35,7 @@ export default function HomeHeader() {
             <Link
               key={href}
               href={href}
-              onClick={() => trackEvent('Nav Click', { label, page: 'Header' })}
+              onClick={() => trackEvent(`Header — ${label}`)}
               className={`text-sm font-semibold transition-colors pb-0.5 ${
                 pathname === href
                   ? 'text-purple-950 border-b-2 border-purple-600'
@@ -49,7 +49,7 @@ export default function HomeHeader() {
             <UserMenu />
           ) : (
             <button
-              onClick={() => { trackEvent('Button Click', { button_name: 'Sign In', page: 'Header' }); setShowAuth(true) }}
+              onClick={() => { trackEvent('Header — Sign In'); setShowAuth(true) }}
               className="text-sm text-purple-900 hover:text-purple-950 border border-purple-300 hover:border-purple-500 px-4 py-1.5 rounded-lg transition-all duration-150 bg-white/40"
             >
               Sign in
@@ -96,7 +96,7 @@ export default function HomeHeader() {
             ))}
             {status !== 'authenticated' && (
               <button
-                onClick={() => { setMenuOpen(false); trackEvent('Button Click', { button_name: 'Sign In', page: 'Header — Mobile' }); setShowAuth(true) }}
+                onClick={() => { setMenuOpen(false); trackEvent('Header — Sign In (Mobile)'); setShowAuth(true) }}
                 className="text-sm font-semibold text-purple-700 py-2.5 text-left"
               >
                 Sign in

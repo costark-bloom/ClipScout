@@ -16,7 +16,7 @@ export default function FreeTrialBadge() {
       <div className="flex justify-center mb-8 animate-fade-in w-full max-w-3xl mx-auto px-4">
         <button
           onClick={() => {
-            trackEvent('Button Click', { button_name: 'Free Trial Banner', page: 'Home' })
+            trackEvent('Home — Free Trial Banner')
             setShowAuth(true)
           }}
           className="w-full flex flex-col sm:flex-row items-center justify-center gap-3 bg-gradient-to-r from-purple-600 via-violet-600 to-indigo-600 rounded-2xl px-8 py-5 shadow-xl shadow-purple-600/40 ring-2 ring-white/20 cursor-pointer hover:brightness-110 transition-all duration-150"

@@ -52,15 +52,13 @@ export default function ScriptInput() {
     setLocalScript(example)
     setTooltipDismissed(true)
     textareaRef.current?.focus()
-    trackEvent('Button Click', { button_name: 'Try an Example', page: 'Home' })
+    trackEvent('Home — Try an Example')
   }
 
   const handleSubmit = async () => {
     if (!localScript.trim() || isSubmitting) return
 
-    trackEvent('Button Click', {
-      button_name: 'Find B-Roll',
-      page: 'Home',
+    trackEvent('Home — Find B-Roll', {
       word_count: localScript.trim().split(/\s+/).length,
       video_orientation: videoOrientation,
     })
@@ -186,7 +184,7 @@ The app will identify every visually descriptive moment — like 'towering skysc
               key={value}
               onClick={() => {
                 setVideoOrientation(value)
-                trackEvent('Button Click', { button_name: `Video Format — ${label}`, page: 'Home' })
+                trackEvent(`Home — Video Format — ${label}`)
               }}
               className={[
                 'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150',
