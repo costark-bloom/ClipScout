@@ -8,7 +8,7 @@ interface AuthGateProps {
   onAuthenticated: () => void
 }
 
-type Mode = 'signup' | 'signin'
+type Mode = 'signup' | 'signin' | 'forgot'
 
 export function useAuthGate() {
   const { data: session, status } = useSession()
@@ -25,6 +25,7 @@ export default function AuthGate({ onAuthenticated }: AuthGateProps) {
   const [isGoogleLoading, setIsGoogleLoading] = useState(false)
   const [isEmailLoading, setIsEmailLoading] = useState(false)
   const [error, setError] = useState('')
+  const [forgotSent, setForgotSent] = useState(false)
 
   const handleGoogle = async () => {
     setIsGoogleLoading(true)
@@ -48,6 +49,18 @@ export default function AuthGate({ onAuthenticated }: AuthGateProps) {
         })
         const data = await res.json()
         if (!res.ok) { setError(data.error ?? 'Sign up failed.'); setIsEmailLoading(false); return }
+      } else {
+        // For sign-in, check if the email exists first to give a better error message
+        const checkRes = await fetch('/api/auth/check-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email }),
+        })
+        if (checkRes.status === 404) {
+          setError('No account found with this email address.')
+          setIsEmailLoading(false)
+          return
+        }
       }
 
       const result = await signIn('credentials', {
@@ -57,7 +70,7 @@ export default function AuthGate({ onAuthenticated }: AuthGateProps) {
       })
 
       if (result?.error) {
-        setError(mode === 'signup' ? 'Account created but sign-in failed. Please try signing in.' : 'Incorrect email or password.')
+        setError(mode === 'signup' ? 'Account created but sign-in failed. Please try signing in.' : 'Incorrect password.')
         setIsEmailLoading(false)
         return
       }
@@ -69,8 +82,107 @@ export default function AuthGate({ onAuthenticated }: AuthGateProps) {
     }
   }
 
-  const switchMode = (m: Mode) => { setMode(m); setError('') }
+  const handleForgot = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError('')
+    if (!email) { setError('Please enter your email address.'); return }
+    setIsEmailLoading(true)
+    try {
+      const res = await fetch('/api/auth/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      })
+      const data = await res.json()
+      if (!res.ok) { setError(data.error); setIsEmailLoading(false); return }
+      setForgotSent(true)
+    } catch {
+      setError('Something went wrong. Please try again.')
+    }
+    setIsEmailLoading(false)
+  }
 
+  const switchMode = (m: Mode) => { setMode(m); setError(''); setForgotSent(false) }
+
+  /* ── Forgot password panel ── */
+  if (mode === 'forgot') {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="absolute inset-0 bg-gray-950/60 backdrop-blur-md" />
+        <div className="relative w-full max-w-md bg-gray-900 border border-gray-800 rounded-2xl shadow-2xl shadow-black/50 animate-slide-up overflow-hidden">
+          <div className="h-1 w-full bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-500" />
+          <div className="px-8 py-7">
+            <div className="flex flex-col items-center gap-3 mb-6">
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-950/50">
+                <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
+                </svg>
+              </div>
+              <div className="text-center">
+                <h2 className="text-xl font-bold text-gray-100 tracking-tight">Reset password</h2>
+                <p className="text-sm text-gray-500 mt-1">
+                  {forgotSent ? 'Check your inbox' : "We'll send you a reset link"}
+                </p>
+              </div>
+            </div>
+
+            {forgotSent ? (
+              <div className="text-center space-y-3">
+                <div className="text-4xl">📬</div>
+                <p className="text-sm text-gray-300">
+                  A reset link was sent to <span className="text-indigo-400 font-medium">{email}</span>.
+                </p>
+                <p className="text-xs text-gray-500">Didn&apos;t get it? Check your spam folder or try again.</p>
+                <button
+                  onClick={() => setForgotSent(false)}
+                  className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors"
+                >
+                  Resend email
+                </button>
+              </div>
+            ) : (
+              <form onSubmit={handleForgot} className="space-y-3">
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="you@example.com"
+                  autoFocus
+                  className="w-full bg-gray-800 border border-gray-700 text-gray-100 placeholder-gray-600 rounded-lg px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                />
+                {error && (
+                  <p className="text-xs text-red-400 bg-red-950/40 border border-red-900/50 rounded-lg px-3 py-2">{error}</p>
+                )}
+                <button
+                  type="submit"
+                  disabled={isEmailLoading}
+                  className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-900 disabled:cursor-not-allowed text-white font-semibold py-2.5 rounded-lg text-sm transition-all flex items-center justify-center gap-2"
+                >
+                  {isEmailLoading ? (
+                    <>
+                      <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                      </svg>
+                      Sending…
+                    </>
+                  ) : 'Send reset link'}
+                </button>
+              </form>
+            )}
+
+            <div className="mt-5 pt-4 border-t border-gray-800 text-center">
+              <button onClick={() => switchMode('signin')} className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors">
+                ← Back to sign in
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  /* ── Sign up / Sign in panel ── */
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-gray-950/60 backdrop-blur-md" />
@@ -166,13 +278,26 @@ export default function AuthGate({ onAuthenticated }: AuthGateProps) {
               autoFocus
               className="w-full bg-gray-800 border border-gray-700 text-gray-100 placeholder-gray-600 rounded-lg px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
             />
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              className="w-full bg-gray-800 border border-gray-700 text-gray-100 placeholder-gray-600 rounded-lg px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
-            />
+            <div>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                className="w-full bg-gray-800 border border-gray-700 text-gray-100 placeholder-gray-600 rounded-lg px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+              />
+              {mode === 'signin' && (
+                <div className="text-right mt-1.5">
+                  <button
+                    type="button"
+                    onClick={() => switchMode('forgot')}
+                    className="text-[11px] text-gray-500 hover:text-indigo-400 transition-colors"
+                  >
+                    Forgot password?
+                  </button>
+                </div>
+              )}
+            </div>
 
             {error && (
               <p className="text-xs text-red-400 bg-red-950/40 border border-red-900/50 rounded-lg px-3 py-2">
