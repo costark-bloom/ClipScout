@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Image from 'next/image'
 import type { VideoResult } from '@/lib/types'
 import { getReuseScore, TIER_COLORS } from '@/lib/reuse-score'
+import { trackEvent } from '@/lib/analytics'
 import VideoPreview from './VideoPreview'
 
 interface VideoCardProps {
@@ -51,7 +52,7 @@ export default function VideoCard({ video }: VideoCardProps) {
       <div className="shrink-0 w-52 bg-purple-100/70 border border-purple-200 rounded-xl overflow-hidden hover:border-purple-400 transition-all duration-200 group flex flex-col backdrop-blur-sm">
         {/* Thumbnail — clicking anywhere on it opens preview */}
         <button
-          onClick={() => setShowPreview(true)}
+          onClick={() => { setShowPreview(true); trackEvent('Results — Video Preview', { platform: video.platform, title: video.title }) }}
           className="relative aspect-video bg-purple-100 overflow-hidden w-full block focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400"
           aria-label={`Preview ${video.title}`}
         >
@@ -157,7 +158,7 @@ export default function VideoCard({ video }: VideoCardProps) {
           {/* Action buttons */}
           <div className="flex gap-1.5 mt-auto pt-1">
             <button
-              onClick={() => setShowPreview(true)}
+              onClick={() => { setShowPreview(true); trackEvent('Results — Video Preview', { platform: video.platform, title: video.title }) }}
               className="flex-1 text-[10px] font-medium bg-white hover:bg-purple-50 text-purple-700 border border-purple-200 rounded-md py-1 px-2 transition-colors duration-150 flex items-center justify-center gap-1"
             >
               <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -169,6 +170,7 @@ export default function VideoCard({ video }: VideoCardProps) {
               href={video.sourceUrl}
               target="_blank"
               rel="noopener noreferrer"
+              onClick={() => trackEvent('Results — Video Source Click', { platform: video.platform, title: video.title, url: video.sourceUrl })}
               className="flex-1 text-[10px] font-medium bg-white hover:bg-purple-50 text-purple-600 hover:text-purple-900 border border-purple-200 rounded-md py-1 px-2 transition-colors duration-150 flex items-center justify-center gap-1"
             >
               <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
