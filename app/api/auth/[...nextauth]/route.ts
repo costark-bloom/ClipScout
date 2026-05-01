@@ -41,6 +41,21 @@ export const authOptions: NextAuthOptions = {
   ],
   session: { strategy: 'jwt' },
   callbacks: {
+    async signIn({ user, account }) {
+      if (!user.email) return true
+      const provider = account?.provider ?? 'email'
+      // Upsert into users table so all auth methods are tracked
+      await supabase.from('users').upsert(
+        {
+          email: user.email.toLowerCase(),
+          name: user.name ?? null,
+          avatar_url: user.image ?? null,
+          provider,
+        },
+        { onConflict: 'email', ignoreDuplicates: false }
+      )
+      return true
+    },
     async redirect({ url, baseUrl }) {
       if (url.startsWith(baseUrl)) return `${baseUrl}/results`
       if (url.startsWith('/')) return `${baseUrl}/results`
