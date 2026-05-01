@@ -39,9 +39,34 @@ export default function AuthGate({ onAuthenticated }: AuthGateProps) {
     if (password.length < 6) { setError('Password must be at least 6 characters.'); return }
 
     setIsEmailLoading(true)
-    await new Promise((r) => setTimeout(r, 800))
-    setIsEmailLoading(false)
-    onAuthenticated()
+    try {
+      if (mode === 'signup') {
+        const res = await fetch('/api/auth/signup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password, name }),
+        })
+        const data = await res.json()
+        if (!res.ok) { setError(data.error ?? 'Sign up failed.'); setIsEmailLoading(false); return }
+      }
+
+      const result = await signIn('credentials', {
+        email,
+        password,
+        redirect: false,
+      })
+
+      if (result?.error) {
+        setError(mode === 'signup' ? 'Account created but sign-in failed. Please try signing in.' : 'Incorrect email or password.')
+        setIsEmailLoading(false)
+        return
+      }
+
+      onAuthenticated()
+    } catch {
+      setError('Something went wrong. Please try again.')
+      setIsEmailLoading(false)
+    }
   }
 
   const switchMode = (m: Mode) => { setMode(m); setError('') }
