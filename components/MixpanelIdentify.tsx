@@ -49,9 +49,17 @@ export default function MixpanelIdentify() {
     if (!mp) return
 
     const params = new URLSearchParams(window.location.search)
-    if (params.has('gad_source')) {
-      const source = 'Google Ad'
-      // register_once so first-touch attribution is preserved across the session
+
+    let source: string | null = null
+    if (params.has('gad_source') || params.has('gclid')) {
+      source = 'Google Ad'
+    } else if (params.get('utm_source') === 'facebook' || params.get('utm_source') === 'instagram' || params.has('fbclid')) {
+      source = 'Facebook / Instagram Ad'
+    } else if (params.get('utm_source') === 'tiktok' || params.has('ttclid')) {
+      source = 'TikTok Ad'
+    }
+
+    if (source) {
       mp.register_once({ referrer_source: source })
       mp.people.set_once({ first_referrer_source: source })
     }
