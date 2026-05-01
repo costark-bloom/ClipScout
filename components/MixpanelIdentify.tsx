@@ -1,11 +1,28 @@
 'use client'
 
 import { useEffect } from 'react'
+import { usePathname } from 'next/navigation'
 import { useSession } from 'next-auth/react'
+
+const PAGE_NAMES: Record<string, string> = {
+  '/':                 'Home',
+  '/results':          'Results',
+  '/settings':         'Settings',
+  '/pricing':          'Pricing',
+  '/pricing/success':  'Pricing — Success',
+  '/privacy':          'Privacy Policy',
+  '/terms':            'Terms of Service',
+}
+
+function getPageName(path: string): string {
+  return PAGE_NAMES[path] ?? path
+}
 
 export default function MixpanelIdentify() {
   const { data: session } = useSession()
+  const pathname = usePathname()
 
+  // Identify / reset user when auth state changes
   useEffect(() => {
     if (typeof window === 'undefined') return
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -20,10 +37,22 @@ export default function MixpanelIdentify() {
         $avatar: session.user.image ?? undefined,
       })
     } else {
-      // User signed out — reset to anonymous
       mp.reset()
     }
   }, [session])
+
+  // Track named page views on every route change
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const mp = (window as any).mixpanel
+    if (!mp) return
+
+    mp.track('Page View', {
+      page_name: getPageName(pathname),
+      page_path: pathname,
+    })
+  }, [pathname])
 
   return null
 }
