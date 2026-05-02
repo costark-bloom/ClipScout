@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import useAppStore from '@/store/useAppStore'
 import type { SavedScript } from '@/lib/supabase'
 import HomeHeader from '@/components/HomeHeader'
+import { trackEvent } from '@/lib/analytics'
 
 function timeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime()
@@ -44,6 +45,7 @@ export default function ScriptsPage() {
   const { setIsAnalyzing, setError, addSegments, setSearchResults, setChapterStatus } = useAppStore()
 
   const handleLoad = async (s: SavedScript) => {
+    trackEvent('Scripts — Load Script', { script_title: s.title ?? 'untitled' })
     setLoadingId(s.id)
     reset()
 
@@ -117,6 +119,7 @@ export default function ScriptsPage() {
   }
 
   const handleDelete = async (id: string) => {
+    trackEvent('Scripts — Delete Script')
     setDeletingId(id)
     await fetch(`/api/scripts/${id}`, { method: 'DELETE' })
     setScripts((prev) => prev.filter((s) => s.id !== id))

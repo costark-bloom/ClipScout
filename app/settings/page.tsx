@@ -5,6 +5,7 @@ import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import HomeHeader from '@/components/HomeHeader'
+import { trackEvent } from '@/lib/analytics'
 
 type Tab = 'general' | 'billing' | 'integrations'
 
@@ -72,6 +73,7 @@ export default function SettingsPage() {
 
   const handleSaveName = async () => {
     if (!displayName.trim()) return
+    trackEvent('Settings — Display Name Saved')
     setSavingName(true)
     setNameMessage(null)
     await new Promise((r) => setTimeout(r, 600))
@@ -81,6 +83,7 @@ export default function SettingsPage() {
 
   const handleSaveFreepik = async () => {
     if (!freepikKey.trim()) return
+    trackEvent('Settings — Freepik Key Saved')
     setSaving(true)
     setIntMessage(null)
     try {
@@ -101,6 +104,7 @@ export default function SettingsPage() {
   }
 
   const handleRemoveFreepik = async () => {
+    trackEvent('Settings — Freepik Key Removed')
     setRemoving(true)
     setIntMessage(null)
     try {
@@ -128,6 +132,7 @@ export default function SettingsPage() {
   }
 
   const handleCancelSubscription = async () => {
+    trackEvent('Settings — Cancel Subscription Confirmed')
     setCancelling(true)
     setCancelMessage(null)
     try {
@@ -237,7 +242,7 @@ export default function SettingsPage() {
               {NAV_ITEMS.map((item) => (
                 <button
                   key={item.id}
-                  onClick={() => setTab(item.id)}
+                  onClick={() => { setTab(item.id); trackEvent('Settings — Tab Changed', { tab: item.id }) }}
                   className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium transition-all text-left ${
                     tab === item.id
                       ? 'bg-white/80 text-purple-950 shadow-sm border border-purple-200'

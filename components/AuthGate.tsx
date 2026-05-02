@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { signIn, useSession } from 'next-auth/react'
+import { trackEvent } from '@/lib/analytics'
 
 interface AuthGateProps {
   onAuthenticated: () => void
@@ -28,6 +29,7 @@ export default function AuthGate({ onAuthenticated }: AuthGateProps) {
   const [forgotSent, setForgotSent] = useState(false)
 
   const handleGoogle = async () => {
+    trackEvent('Sign In — Clicked Google')
     setIsGoogleLoading(true)
     await signIn('google', { callbackUrl: '/results' })
   }
@@ -39,6 +41,7 @@ export default function AuthGate({ onAuthenticated }: AuthGateProps) {
     if (mode === 'signup' && !name) { setError('Please enter your name.'); return }
     if (password.length < 6) { setError('Password must be at least 6 characters.'); return }
 
+    trackEvent(mode === 'signup' ? 'Sign Up — Submitted' : 'Sign In — Submitted')
     setIsEmailLoading(true)
     try {
       if (mode === 'signup') {
@@ -48,7 +51,12 @@ export default function AuthGate({ onAuthenticated }: AuthGateProps) {
           body: JSON.stringify({ email, password, name }),
         })
         const data = await res.json()
-        if (!res.ok) { setError(data.error ?? 'Sign up failed.'); setIsEmailLoading(false); return }
+        if (!res.ok) {
+          trackEvent('Sign Up — Error', { error: data.error ?? 'Sign up failed' })
+          setError(data.error ?? 'Sign up failed.')
+          setIsEmailLoading(false)
+          return
+        }
       } else {
         // For sign-in, check if the email exists first to give a better error message
         const checkRes = await fetch('/api/auth/check-email', {
@@ -57,6 +65,7 @@ export default function AuthGate({ onAuthenticated }: AuthGateProps) {
           body: JSON.stringify({ email }),
         })
         if (checkRes.status === 404) {
+          trackEvent('Sign In — Error: Email Not Found')
           setError('No account found with this email address.')
           setIsEmailLoading(false)
           return
@@ -70,11 +79,18 @@ export default function AuthGate({ onAuthenticated }: AuthGateProps) {
       })
 
       if (result?.error) {
-        setError(mode === 'signup' ? 'Account created but sign-in failed. Please try signing in.' : 'Incorrect password.')
+        if (mode === 'signup') {
+          trackEvent('Sign Up — Error', { error: 'Post-creation sign-in failed' })
+          setError('Account created but sign-in failed. Please try signing in.')
+        } else {
+          trackEvent('Sign In — Error: Wrong Password')
+          setError('Incorrect password.')
+        }
         setIsEmailLoading(false)
         return
       }
 
+      trackEvent(mode === 'signup' ? 'Sign Up — Success' : 'Sign In — Success')
       onAuthenticated()
     } catch {
       setError('Something went wrong. Please try again.')
@@ -94,7 +110,13 @@ export default function AuthGate({ onAuthenticated }: AuthGateProps) {
         body: JSON.stringify({ email }),
       })
       const data = await res.json()
-      if (!res.ok) { setError(data.error); setIsEmailLoading(false); return }
+      if (!res.ok) {
+        trackEvent('Forgot Password — Error', { error: data.error })
+        setError(data.error)
+        setIsEmailLoading(false)
+        return
+      }
+      trackEvent('Forgot Password — Reset Email Sent')
       setForgotSent(true)
     } catch {
       setError('Something went wrong. Please try again.')

@@ -6,6 +6,7 @@ import { useSession } from 'next-auth/react'
 import HomeHeader from '@/components/HomeHeader'
 import CreditBoostModal from '@/components/CreditBoostModal'
 import type { PlanId, BillingInterval } from '@/lib/stripe'
+import { trackEvent } from '@/lib/analytics'
 
 // ─── Pricing data ────────────────────────────────────────────────────────────
 
@@ -181,6 +182,7 @@ export default function PricingPage() {
   const { data: session } = useSession()
 
   const startCheckout = async (planId: PlanId, interval: BillingInterval, packId?: string | null) => {
+    trackEvent('Pricing — Checkout Started', { plan: planId, interval: interval, pack: packId ?? null })
     setCheckoutLoading(true)
     setLoadingPlan(`${planId}-${interval}`)
     try {
@@ -201,9 +203,11 @@ export default function PricingPage() {
 
   const handleGetStarted = (plan: (typeof PLANS)[0]) => {
     if (!session) {
+      trackEvent('Pricing — Get Started (Not Signed In)', { plan: plan.name })
       window.location.href = '/?signin=1'
       return
     }
+    trackEvent('Pricing — Get Started Clicked', { plan: plan.name, billing: annual ? 'annual' : 'monthly' })
     if (!annual) {
       setQuarterlyModal(plan)
     } else {
@@ -250,7 +254,7 @@ export default function PricingPage() {
               Monthly
             </span>
             <button
-              onClick={() => setAnnual((a) => !a)}
+              onClick={() => { const next = !annual; setAnnual(next); trackEvent('Pricing — Billing Toggle', { billing: next ? 'annual' : 'monthly' }) }}
               className={`relative w-12 h-6 rounded-full transition-colors duration-200 focus:outline-none ${
                 annual ? 'bg-purple-600' : 'bg-purple-200'
               }`}
