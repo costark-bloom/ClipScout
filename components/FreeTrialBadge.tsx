@@ -13,26 +13,22 @@ export default function FreeTrialBadge() {
 
   return (
     <>
-      <div className="flex justify-center mb-8 animate-fade-in w-full max-w-3xl mx-auto px-4">
+      <div className="flex justify-center mb-6 animate-fade-in px-4">
         <button
           onClick={() => {
             trackEvent('Home — Free Trial Banner')
             setShowAuth(true)
           }}
-          className="w-full flex flex-col sm:flex-row items-center justify-center gap-3 bg-gradient-to-r from-purple-600 via-violet-600 to-indigo-600 rounded-2xl px-8 py-5 shadow-xl shadow-purple-600/40 ring-2 ring-white/20 cursor-pointer hover:brightness-110 transition-all duration-150"
+          className="inline-flex items-center gap-2.5 bg-gradient-to-r from-purple-600 via-violet-600 to-indigo-600 rounded-full px-5 py-2.5 shadow-lg shadow-purple-600/30 ring-1 ring-white/20 cursor-pointer hover:brightness-110 transition-all duration-150"
         >
-          <div className="flex items-center gap-3">
-            <span className="text-4xl">🎁</span>
-            <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4">
-              <span className="text-white font-extrabold text-2xl md:text-3xl tracking-tight">
-                First 3 chapters free
-              </span>
-              <span className="hidden sm:block w-px h-8 bg-white/30" />
-              <span className="text-white font-semibold text-xl md:text-2xl">
-                No credit card needed
-              </span>
-            </div>
-          </div>
+          <span className="text-lg">🎁</span>
+          <span className="text-white font-semibold text-sm">
+            First 3 chapters free
+          </span>
+          <span className="w-px h-4 bg-white/30" />
+          <span className="text-white/80 text-sm">
+            No credit card needed
+          </span>
         </button>
       </div>
 
