@@ -1,5 +1,4 @@
 import ScriptInput from '@/components/ScriptInput'
-import DisclaimerBanner from '@/components/DisclaimerBanner'
 import HomeHeader from '@/components/HomeHeader'
 import FreeTrialBadge from '@/components/FreeTrialBadge'
 
@@ -27,7 +26,6 @@ export default function HomePage() {
       </div>
 
       <div className="relative" style={{zIndex:50}}>
-        <DisclaimerBanner />
         <HomeHeader />
       </div>
 
