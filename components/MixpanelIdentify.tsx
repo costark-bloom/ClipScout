@@ -9,9 +9,12 @@ const PAGE_NAMES: Record<string, string> = {
   '/results':          'Results',
   '/settings':         'Settings',
   '/pricing':          'Pricing',
-  '/pricing/success':  'Pricing — Success',
+  '/pricing/success':  'Pricing Success',
   '/privacy':          'Privacy Policy',
   '/terms':            'Terms of Service',
+  '/scripts':          'Saved Scripts',
+  '/contact':          'Contact',
+  '/reset-password':   'Reset Password',
 }
 
 function getPageName(path: string): string {
@@ -84,8 +87,9 @@ export default function MixpanelIdentify() {
     if (!mp) return
 
     const trackPageView = () => {
-      mp.track('Page View', {
-        page_name: getPageName(pathname),
+      const pageName = getPageName(pathname)
+      mp.track(`${pageName} Page Viewed`, {
+        page_name: pageName,
         page_path: pathname,
       })
     }
