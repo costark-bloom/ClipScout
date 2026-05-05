@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { usePathname } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 
@@ -19,27 +19,36 @@ function getPageName(path: string): string {
 }
 
 export default function MixpanelIdentify() {
-  const { data: session } = useSession()
+  const { data: session, status } = useSession()
   const pathname = usePathname()
+  // Track the previous authenticated email so we only reset on actual sign-out
+  const prevEmailRef = useRef<string | null | undefined>(undefined)
 
   // Identify / reset user when auth state changes
   useEffect(() => {
     if (typeof window === 'undefined') return
+    if (status === 'loading') return // wait until auth is resolved
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const mp = (window as any).mixpanel
     if (!mp) return
 
-    if (session?.user?.email) {
-      mp.identify(session.user.email)
+    const email = session?.user?.email ?? null
+
+    if (email) {
+      mp.identify(email)
       mp.people.set({
-        $email: session.user.email,
-        $name: session.user.name ?? session.user.email,
-        $avatar: session.user.image ?? undefined,
+        $email: email,
+        $name: session?.user?.name ?? email,
+        $avatar: session?.user?.image ?? undefined,
       })
-    } else {
+    } else if (prevEmailRef.current) {
+      // Only reset when transitioning from authenticated → unauthenticated (sign-out)
       mp.reset()
     }
-  }, [session])
+    // For unauthenticated users on first load, do nothing — preserve their anonymous distinct_id
+
+    prevEmailRef.current = email
+  }, [session, status])
 
   // Detect Google Ads traffic and register as a super property (runs once on mount)
   useEffect(() => {
