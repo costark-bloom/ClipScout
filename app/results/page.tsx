@@ -43,6 +43,7 @@ export default function ResultsPage() {
     savedScriptContext,
     setSavedScriptContext,
     videoOrientation,
+    isExampleScript,
   } = useAppStore()
 
   const [loadingSegmentIds, setLoadingSegmentIds] = useState<Set<string>>(new Set())
@@ -192,12 +193,23 @@ export default function ResultsPage() {
         const { results } = await res.json()
         addSearchResults(results)
         setChapterStatus(chapterNum, 'done')
+
+        // Extract this chapter's slice of the script for analytics
+        const chapterStart = scriptChunkOffsets[chapterNum - 1] ?? 0
+        const chapterEnd = scriptChunkOffsets[chapterNum] ?? script.length
+        const chapterScript = script.slice(chapterStart, chapterEnd).trim().slice(0, 500)
+
+        trackEvent('Chapter Loaded', {
+          chapter_number: chapterNum,
+          chapter_script: chapterScript,
+          is_example: isExampleScript,
+        })
       } catch (err) {
         console.error(`Chapter ${chapterNum} search failed:`, err)
         setChapterStatus(chapterNum, 'idle') // allow retry
       }
     },
-    [segments, setChapterStatus, addSearchResults]
+    [segments, setChapterStatus, addSearchResults, script, scriptChunkOffsets, isExampleScript]
   )
 
   const handleLoadNextChapter = (chapterNum: number) => {

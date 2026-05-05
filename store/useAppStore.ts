@@ -7,8 +7,10 @@ import type { AppState, ChapterStatus, ScriptSegment, SearchResults, VideoOrient
 interface AppStateWithHydration extends AppState {
   _hasHydrated: boolean
   showUpgradeModal: boolean
+  isExampleScript: boolean
   setHasHydrated: (value: boolean) => void
   setShowUpgradeModal: (value: boolean) => void
+  setIsExampleScript: (value: boolean) => void
 }
 const useAppStore = create<AppStateWithHydration>()(
   persist(
@@ -27,9 +29,11 @@ const useAppStore = create<AppStateWithHydration>()(
       scriptChunkCount: 1,
       savedScriptContext: '',
       videoOrientation: 'both' as VideoOrientation,
+      isExampleScript: false,
 
       setHasHydrated: (value: boolean) => set({ _hasHydrated: value }),
       setShowUpgradeModal: (value: boolean) => set({ showUpgradeModal: value }),
+      setIsExampleScript: (value: boolean) => set({ isExampleScript: value }),
       setVideoOrientation: (orientation: VideoOrientation) => set({ videoOrientation: orientation }),
       setScriptChunks: (offsets: number[], count: number) =>
         set({ scriptChunkOffsets: offsets, scriptChunkCount: count }),
@@ -75,6 +79,7 @@ const useAppStore = create<AppStateWithHydration>()(
           chapterStatus: {},
           error: null,
           showUpgradeModal: false,
+          isExampleScript: false,
           scriptChunkOffsets: [],
           scriptChunkCount: 1,
           savedScriptContext: '',
@@ -92,6 +97,7 @@ const useAppStore = create<AppStateWithHydration>()(
         scriptChunkCount: state.scriptChunkCount,
         savedScriptContext: state.savedScriptContext,
         videoOrientation: state.videoOrientation,
+        isExampleScript: state.isExampleScript,
       }),
       onRehydrateStorage: () => (state) => {
         state?.setHasHydrated(true)

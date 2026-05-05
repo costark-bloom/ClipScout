@@ -33,3 +33,10 @@ next-env.d.ts
 # OS
 .DS_Store
 Thumbs.db
+
+# Media / Marketing assets — keep out of git
+*.mov
+*.mp4
+*.avi
+*.mkv
+Marketing/

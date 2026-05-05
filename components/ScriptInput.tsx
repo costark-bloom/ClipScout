@@ -36,6 +36,7 @@ export default function ScriptInput() {
     showUpgradeModal, setShowUpgradeModal,
     setScriptChunks, setSavedScriptContext,
     videoOrientation, setVideoOrientation,
+    setIsExampleScript,
   } = useAppStore()
   const [localScript, setLocalScript] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -64,9 +65,11 @@ export default function ScriptInput() {
     })
 
     const trimmedScript = localScript.trim()
+    const isExample = EXAMPLE_SCRIPTS.some((ex) => ex.trim() === trimmedScript)
     setIsSubmitting(true)
     reset()
     setScript(trimmedScript)
+    setIsExampleScript(isExample)
 
     // Compute chunk boundaries client-side so the left panel knows where each chapter starts
     const chunks = splitIntoChunks(trimmedScript)
