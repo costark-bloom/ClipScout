@@ -74,17 +74,27 @@ export default function MixpanelIdentify() {
     }
   }, [])
 
-  // Track named page views on every route change
+  // Track named page views on every route change.
+  // On the very first load Mixpanel may not have initialised yet (afterInteractive),
+  // so we use mp.ready() which queues the call and replays it once the library loads.
   useEffect(() => {
     if (typeof window === 'undefined') return
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const mp = (window as any).mixpanel
     if (!mp) return
 
-    mp.track('Page View', {
-      page_name: getPageName(pathname),
-      page_path: pathname,
-    })
+    const trackPageView = () => {
+      mp.track('Page View', {
+        page_name: getPageName(pathname),
+        page_path: pathname,
+      })
+    }
+
+    if (typeof mp.ready === 'function') {
+      mp.ready(trackPageView)
+    } else {
+      trackPageView()
+    }
   }, [pathname])
 
   return null
