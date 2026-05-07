@@ -79,26 +79,38 @@ export default function MixpanelIdentify() {
 
   // Track named page views on every route change.
   // On the very first load Mixpanel may not have initialised yet (afterInteractive),
-  // so we use mp.ready() which queues the call and replays it once the library loads.
+  // so we poll until the stub appears, then hand off to mp.ready() which queues the
+  // call and replays it once the real library loads.
   useEffect(() => {
     if (typeof window === 'undefined') return
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const mp = (window as any).mixpanel
-    if (!mp) return
 
+    const pageName = getPageName(pathname)
     const trackPageView = () => {
-      const pageName = getPageName(pathname)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const mp = (window as any).mixpanel
       mp.track(`${pageName} Page Viewed`, {
         page_name: pageName,
         page_path: pathname,
       })
     }
 
-    if (typeof mp.ready === 'function') {
-      mp.ready(trackPageView)
-    } else {
-      trackPageView()
+    let attempts = 0
+    const MAX_ATTEMPTS = 40 // 40 × 50 ms = 2 s
+    const poll = () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const mp = (window as any).mixpanel
+      if (!mp) {
+        if (++attempts < MAX_ATTEMPTS) setTimeout(poll, 50)
+        return
+      }
+      if (typeof mp.ready === 'function') {
+        mp.ready(trackPageView)
+      } else {
+        trackPageView()
+      }
     }
+
+    poll()
   }, [pathname])
 
   return null
