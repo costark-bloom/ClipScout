@@ -355,18 +355,24 @@ The app will identify every visually descriptive moment — like 'towering skysc
                 </a>
               </p>
             ) : remainingSlots !== null ? (
-              <p className="text-[11px] text-purple-400 flex items-center justify-between">
-                <span>
-                  Press <kbd className="bg-purple-100 border border-purple-200 px-1 py-0.5 rounded text-[10px]">Enter</kbd> or <kbd className="bg-purple-100 border border-purple-200 px-1 py-0.5 rounded text-[10px]">,</kbd> after each keyword · Each keyword uses 1 credit
-                </span>
-                <span className={['font-semibold ml-3 shrink-0', remainingSlots <= 2 ? 'text-amber-500' : 'text-purple-400'].join(' ')}>
-                  {remainingSlots} credit{remainingSlots !== 1 ? 's' : ''} remaining
-                </span>
-              </p>
+              <div className="space-y-1">
+                <p className="text-[11px] text-purple-500 italic">Tip: the more descriptive your keywords, the better the results — e.g. "golden hour beach waves" beats "beach".</p>
+                <p className="text-[11px] text-purple-400 flex items-center justify-between">
+                  <span>
+                    Press <kbd className="bg-purple-100 border border-purple-200 px-1 py-0.5 rounded text-[10px]">Enter</kbd> or <kbd className="bg-purple-100 border border-purple-200 px-1 py-0.5 rounded text-[10px]">,</kbd> after each keyword · Each keyword uses 1 credit
+                  </span>
+                  <span className={['font-semibold ml-3 shrink-0', remainingSlots <= 2 ? 'text-amber-500' : 'text-purple-400'].join(' ')}>
+                    {remainingSlots} credit{remainingSlots !== 1 ? 's' : ''} remaining
+                  </span>
+                </p>
+              </div>
             ) : (
-              <p className="text-[11px] text-purple-400">
-                Press <kbd className="bg-purple-100 border border-purple-200 px-1 py-0.5 rounded text-[10px]">Enter</kbd> or <kbd className="bg-purple-100 border border-purple-200 px-1 py-0.5 rounded text-[10px]">,</kbd> after each keyword · Each keyword gets its own set of clips
-              </p>
+              <div className="space-y-1">
+                <p className="text-[11px] text-purple-500 italic">Tip: the more descriptive your keywords, the better the results — e.g. "golden hour beach waves" beats "beach".</p>
+                <p className="text-[11px] text-purple-400">
+                  Press <kbd className="bg-purple-100 border border-purple-200 px-1 py-0.5 rounded text-[10px]">Enter</kbd> or <kbd className="bg-purple-100 border border-purple-200 px-1 py-0.5 rounded text-[10px]">,</kbd> after each keyword · Each keyword gets its own set of clips
+                </p>
+              </div>
             )}
           </div>
         )}
