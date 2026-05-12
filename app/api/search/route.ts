@@ -8,6 +8,7 @@ import { searchFreepik } from '@/lib/freepik'
 import { enrichWithTranscripts } from '@/lib/transcript-matcher'
 import { enrichWithMetadata } from '@/lib/metadata-matcher'
 import { generateFallbackQueries } from '@/lib/claude'
+import { getCreditsRemaining, deductCredit } from '@/lib/credits'
 import { supabase } from '@/lib/supabase'
 import type { ScriptSegment, SearchResults, VideoResult, VideoOrientation } from '@/lib/types'
 
@@ -81,9 +82,9 @@ async function searchForSegment(
     : []
   const enrichedYoutube = [...scoredYoutube, ...metadataFallback]
 
-  // Filter out results with very low relevance scores (< 0.2)
+  // Filter out results with low relevance scores (< 0.35)
   const filterLowRelevance = (videos: VideoResult[]) =>
-    videos.filter((v) => v.relevanceScore === undefined || v.relevanceScore >= 0.2)
+    videos.filter((v) => v.relevanceScore === undefined || v.relevanceScore >= 0.35)
 
   const filteredStock = [
     ...filterLowRelevance(enrichedPexels),
@@ -157,7 +158,11 @@ export const maxDuration = 120 // allow up to 2 minutes for large scripts
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { segments, orientation = 'both' } = body as { segments: unknown; orientation?: VideoOrientation }
+    const {
+      segments,
+      orientation = 'both',
+      deductCreditsPerSegment = false,
+    } = body as { segments: unknown; orientation?: VideoOrientation; deductCreditsPerSegment?: boolean }
 
     if (!Array.isArray(segments)) {
       return NextResponse.json({ error: 'segments array is required' }, { status: 400 })
@@ -167,15 +172,25 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ results: [] })
     }
 
+    const session = await getServerSession(authOptions)
+    const userEmail = session?.user?.email ?? null
+
+    // Deduct 1 credit per segment for keyword searches (authenticated users only)
+    if (deductCreditsPerSegment && userEmail) {
+      const creditsRemaining = await getCreditsRemaining(userEmail)
+      if (creditsRemaining < segments.length) {
+        return NextResponse.json({ error: 'INSUFFICIENT_CREDITS' }, { status: 402 })
+      }
+    }
+
     // Look up user's Freepik key if they're signed in
     let freepikApiKey: string | undefined
     try {
-      const session = await getServerSession(authOptions)
-      if (session?.user?.email) {
+      if (userEmail) {
         const { data } = await supabase
           .from('user_settings')
           .select('freepik_api_key')
-          .eq('user_email', session.user.email)
+          .eq('user_email', userEmail)
           .single()
         freepikApiKey = data?.freepik_api_key ?? undefined
         if (freepikApiKey) {
@@ -192,6 +207,14 @@ export async function POST(request: NextRequest) {
       3,
       (segment) => searchForSegment(segment, freepikApiKey, orientation)
     )
+
+    // Deduct credits after a successful search
+    if (deductCreditsPerSegment && userEmail) {
+      await Promise.all(
+        (segments as ScriptSegment[]).map(() => deductCredit(userEmail))
+      )
+      console.log(`[credits] deducted ${segments.length} credit(s) for ${userEmail} (keyword search)`)
+    }
 
     return NextResponse.json({ results })
   } catch (error) {

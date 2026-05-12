@@ -49,7 +49,7 @@ export default function HomePage() {
           </h1>
 
           <p className="text-lg text-purple-700 max-w-xl text-balance text-center mx-auto">
-            Paste your script. AI identifies every visual moment to discover matching b-roll footage from across the web.
+            AI identifies every visual moment to discover matching b-roll footage from across the web.
           </p>
 
         </div>

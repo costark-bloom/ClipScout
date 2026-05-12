@@ -30,10 +30,12 @@ const useAppStore = create<AppStateWithHydration>()(
       savedScriptContext: '',
       videoOrientation: 'both' as VideoOrientation,
       isExampleScript: false,
+      isKeywordMode: false,
 
       setHasHydrated: (value: boolean) => set({ _hasHydrated: value }),
       setShowUpgradeModal: (value: boolean) => set({ showUpgradeModal: value }),
       setIsExampleScript: (value: boolean) => set({ isExampleScript: value }),
+      setIsKeywordMode: (value: boolean) => set({ isKeywordMode: value }),
       setVideoOrientation: (orientation: VideoOrientation) => set({ videoOrientation: orientation }),
       setScriptChunks: (offsets: number[], count: number) =>
         set({ scriptChunkOffsets: offsets, scriptChunkCount: count }),
@@ -66,6 +68,17 @@ const useAppStore = create<AppStateWithHydration>()(
           segments: state.segments.map((s) => (s.id === id ? { ...s, ...updates } : s)),
         })),
 
+      appendVideosToSegment: (segmentId, newVideos) =>
+        set((state) => {
+          const existing = new Map(state.searchResults.map((r) => [r.segmentId, r]))
+          const current = existing.get(segmentId)
+          existing.set(segmentId, {
+            segmentId,
+            videos: [...(current?.videos ?? []), ...newVideos],
+          })
+          return { searchResults: Array.from(existing.values()) }
+        }),
+
       setError: (error: string | null) => set({ error }),
 
       reset: () =>
@@ -80,6 +93,7 @@ const useAppStore = create<AppStateWithHydration>()(
           error: null,
           showUpgradeModal: false,
           isExampleScript: false,
+          isKeywordMode: false,
           scriptChunkOffsets: [],
           scriptChunkCount: 1,
           savedScriptContext: '',
@@ -98,6 +112,7 @@ const useAppStore = create<AppStateWithHydration>()(
         savedScriptContext: state.savedScriptContext,
         videoOrientation: state.videoOrientation,
         isExampleScript: state.isExampleScript,
+        isKeywordMode: state.isKeywordMode,
       }),
       onRehydrateStorage: () => (state) => {
         state?.setHasHydrated(true)

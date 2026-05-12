@@ -1,27 +1,39 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { useSession } from 'next-auth/react'
 import type { ScriptSegment, VideoResult } from '@/lib/types'
 import useAppStore from '@/store/useAppStore'
 import VideoCard from './VideoCard'
+import { trackEvent } from '@/lib/analytics'
 
 interface SegmentCardProps {
   segment: ScriptSegment
   segmentNumber: number
   videos: VideoResult[]
   onIntersect: (segmentId: string) => void
+  onInsufficientCredits?: () => void
 }
+
+type LoadMoreState = 'idle' | 'loading' | 'done' | 'error'
 
 export default function SegmentCard({
   segment,
   segmentNumber,
   videos,
   onIntersect,
+  onInsufficientCredits,
 }: SegmentCardProps) {
-  const { activeSegmentId, setActiveSegment } = useAppStore()
+  const { activeSegmentId, setActiveSegment, appendVideosToSegment, videoOrientation } = useAppStore()
+  const { status: authStatus } = useSession()
   const isActive = activeSegmentId === segment.id
   const cardRef = useRef<HTMLDivElement>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const [loadMoreState, setLoadMoreState] = useState<LoadMoreState>('idle')
+  const [loadMoreError, setLoadMoreError] = useState<string | null>(null)
+  // Snapshot of how many videos existed before the last "load more" so we can split into rows
+  const originalCountRef = useRef<number>(videos.length)
 
   // IntersectionObserver for bidirectional sync
   useEffect(() => {
@@ -51,8 +63,60 @@ export default function SegmentCard({
 
   const handleQuoteClick = () => {
     setActiveSegment(segment.id)
-    // Scroll the script span into view (InteractiveScript handles this via useEffect)
   }
+
+  const handleLoadMore = async () => {
+    if (loadMoreState === 'loading') return
+
+    trackEvent('Load More Clicked', { segment_topic: segment.topic, segment_text: segment.text.slice(0, 120) })
+
+    originalCountRef.current = videos.length
+    setLoadMoreState('loading')
+    setLoadMoreError(null)
+
+    try {
+      const res = await fetch('/api/search/more', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          segment,
+          orientation: videoOrientation,
+          excludeUrls: videos.map((v) => v.sourceUrl),
+        }),
+      })
+
+      if (res.status === 401) {
+        setLoadMoreState('idle')
+        return
+      }
+
+      if (res.status === 402) {
+        setLoadMoreState('idle')
+        onInsufficientCredits?.()
+        return
+      }
+
+      if (!res.ok) {
+        throw new Error('Search failed')
+      }
+
+      const { videos: moreVideos } = await res.json()
+
+      if (!moreVideos || moreVideos.length === 0) {
+        setLoadMoreState('done')
+        return
+      }
+
+      appendVideosToSegment(segment.id, moreVideos)
+      setLoadMoreState('done')
+    } catch (err) {
+      console.error('[load more]', err)
+      setLoadMoreError('Failed to load more. Try again.')
+      setLoadMoreState('error')
+    }
+  }
+
+  const isAuthenticated = authStatus === 'authenticated'
 
   return (
     <div
@@ -83,11 +147,48 @@ export default function SegmentCard({
             {segment.searchQueries.length} search queries
           </p>
         </div>
-        {isActive && (
-          <span className="ml-auto shrink-0 text-[10px] font-medium text-purple-600 bg-purple-100 border border-purple-200 px-2 py-0.5 rounded-full">
-            Active
-          </span>
-        )}
+
+        {/* Load more button — top-right of header */}
+        <div className="ml-auto shrink-0 flex items-center gap-2">
+          {isActive && (
+            <span className="text-[10px] font-medium text-purple-600 bg-purple-100 border border-purple-200 px-2 py-0.5 rounded-full">
+              Active
+            </span>
+          )}
+          {loadMoreState === 'done' ? (
+            <span className="text-[10px] text-purple-500 font-medium">✓ Loaded</span>
+          ) : loadMoreState === 'error' ? (
+            <button
+              onClick={isAuthenticated ? handleLoadMore : onInsufficientCredits}
+              className="flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1.5 rounded-lg bg-red-500 hover:bg-red-600 text-white transition-colors"
+            >
+              Retry
+            </button>
+          ) : (
+            <button
+              onClick={isAuthenticated ? handleLoadMore : onInsufficientCredits}
+              disabled={loadMoreState === 'loading'}
+              className="flex items-center gap-1.5 text-[10px] font-semibold px-2.5 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 disabled:bg-purple-300 disabled:cursor-not-allowed text-white transition-colors"
+            >
+              {loadMoreState === 'loading' ? (
+                <>
+                  <svg className="animate-spin w-3 h-3" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  Loading…
+                </>
+              ) : (
+                <>
+                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
+                  </svg>
+                  Load more
+                </>
+              )}
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Script quote */}
@@ -110,17 +211,36 @@ export default function SegmentCard({
         ))}
       </div>
 
-      {/* Video results horizontal scroll */}
+      {/* Video results — original row */}
       {videos.length > 0 ? (
-        <div className="px-5 pb-5 overflow-x-auto">
-          <div className="flex gap-3" style={{ minWidth: 'max-content' }}>
-            {videos.map((video) => (
-              <VideoCard key={video.id} video={video} />
-            ))}
+        <div className="space-y-4">
+          <div className="px-5 overflow-x-auto">
+            <div className="flex gap-3" style={{ minWidth: 'max-content' }}>
+              {videos.slice(0, originalCountRef.current).map((video) => (
+                <VideoCard key={video.id} video={video} />
+              ))}
+            </div>
           </div>
+
+          {/* More videos row — only shown after a successful load more */}
+          {loadMoreState === 'done' && videos.length > originalCountRef.current && (
+            <div className="px-5">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-[10px] font-semibold uppercase tracking-widest text-purple-500">More clips</span>
+                <div className="flex-1 h-px bg-purple-100" />
+              </div>
+              <div className="overflow-x-auto">
+                <div className="flex gap-3" style={{ minWidth: 'max-content' }}>
+                  {videos.slice(originalCountRef.current).map((video) => (
+                    <VideoCard key={video.id} video={video} />
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       ) : (
-        <div className="mx-5 mb-5 rounded-xl bg-purple-50/60 border border-purple-200 px-4 py-6 text-center">
+        <div className="mx-5 rounded-xl bg-purple-50/60 border border-purple-200 px-4 py-6 text-center">
           <svg
             className="w-8 h-8 text-purple-300 mx-auto mb-2"
             fill="none"
@@ -134,6 +254,9 @@ export default function SegmentCard({
           <p className="text-[10px] text-purple-400 mt-1">Try adjusting the search queries above.</p>
         </div>
       )}
+
+      {/* bottom padding */}
+      <div className="pb-5" />
     </div>
   )
 }

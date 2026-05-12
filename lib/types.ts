@@ -47,7 +47,9 @@ export interface AppState {
   chapterStatus: Record<number, ChapterStatus>
   error: string | null
   videoOrientation: VideoOrientation
+  isKeywordMode: boolean
   setVideoOrientation: (orientation: VideoOrientation) => void
+  setIsKeywordMode: (value: boolean) => void
   setScript: (script: string) => void
   setSegments: (segments: ScriptSegment[]) => void
   addSegments: (segments: ScriptSegment[]) => void
@@ -58,6 +60,7 @@ export interface AppState {
   setIsSearching: (value: boolean) => void
   setChapterStatus: (chapter: number, status: ChapterStatus) => void
   updateSegment: (id: string, updates: Partial<Pick<ScriptSegment, 'topic' | 'searchQueries'>>) => void
+  appendVideosToSegment: (segmentId: string, newVideos: VideoResult[]) => void
   setError: (error: string | null) => void
   reset: () => void
   showUpgradeModal: boolean

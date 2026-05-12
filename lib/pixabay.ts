@@ -1,16 +1,23 @@
 import type { VideoResult, VideoOrientation } from './types'
 
+interface PixabayVideoSize {
+  url: string
+  width: number
+  height: number
+  size: number
+  thumbnail?: string
+}
+
 interface PixabayVideoSizes {
-  large?: { url: string; width: number; height: number; size: number }
-  medium?: { url: string; width: number; height: number; size: number }
-  small?: { url: string; width: number; height: number; size: number }
-  tiny?: { url: string; width: number; height: number; size: number }
+  large?: PixabayVideoSize
+  medium?: PixabayVideoSize
+  small?: PixabayVideoSize
+  tiny?: PixabayVideoSize
 }
 
 interface PixabayHit {
   id: number
   pageURL: string
-  picture_id: string
   user: string
   duration: number
   videos: PixabayVideoSizes
@@ -62,8 +69,13 @@ export async function searchPixabay(query: string, perPage = 5, orientation: Vid
       return true
     })
     .map((hit) => {
-      // Prefer the 640x360 thumbnail; broken images handled client-side via onError
-      const thumbnailUrl = `https://i.vimeocdn.com/video/${hit.picture_id}_640x360.jpg`
+      // Use the thumbnail field provided directly in each video size object
+      const thumbnailUrl =
+        hit.videos.medium?.thumbnail ||
+        hit.videos.small?.thumbnail ||
+        hit.videos.large?.thumbnail ||
+        hit.videos.tiny?.thumbnail ||
+        ''
       const embedUrl =
         hit.videos.medium?.url ||
         hit.videos.large?.url ||

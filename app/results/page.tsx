@@ -13,6 +13,7 @@ import UserMenu from '@/components/UserMenu'
 import UpgradeModal from '@/components/UpgradeModal'
 import type { ScriptSegment } from '@/lib/types'
 import { trackEvent } from '@/lib/analytics'
+import { useCredits } from '@/hooks/useCredits'
 
 // Returns sorted unique chapter numbers from segments
 function getChapters(segments: ScriptSegment[]): number[] {
@@ -44,9 +45,17 @@ export default function ResultsPage() {
     setSavedScriptContext,
     videoOrientation,
     isExampleScript,
+    isKeywordMode,
   } = useAppStore()
 
   const [loadingSegmentIds, setLoadingSegmentIds] = useState<Set<string>>(new Set())
+  const [keywordSearchInput, setKeywordSearchInput] = useState('')
+  const [isSearchingKeyword, setIsSearchingKeyword] = useState(false)
+  const { credits: fetchedCredits, refresh: refreshCredits } = useCredits()
+  // Track credits spent this session so the bar stays accurate without re-fetching
+  const [creditsSpentThisSession, setCreditsSpentThisSession] = useState(0)
+  const availableCredits = fetchedCredits !== null ? Math.max(0, fetchedCredits - creditsSpentThisSession) : null
+  const atKeywordCreditLimit = availableCredits !== null && availableCredits <= 0
   const [loadingChapterInScript, setLoadingChapterInScript] = useState<number | null>(null)
   const [showLoadChapterHint, setShowLoadChapterHint] = useState(false)
   const [scriptDrawerOpen, setScriptDrawerOpen] = useState(false)
@@ -182,11 +191,16 @@ export default function ResultsPage() {
         const res = await fetch('/api/search', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ segments: chapterSegments, orientation: videoOrientation }),
+          body: JSON.stringify({ segments: chapterSegments, orientation: videoOrientation, deductCreditsPerSegment: isKeywordMode }),
         })
 
         if (!res.ok) {
           const err = await res.json()
+          if (res.status === 402 || err.error === 'INSUFFICIENT_CREDITS') {
+            setChapterStatus(chapterNum, 'idle')
+            setShowUpgradeModal(true)
+            return
+          }
           throw new Error(err.error || 'Search failed')
         }
 
@@ -194,16 +208,23 @@ export default function ResultsPage() {
         addSearchResults(results)
         setChapterStatus(chapterNum, 'done')
 
-        // Extract this chapter's slice of the script for analytics
-        const chapterStart = scriptChunkOffsets[chapterNum - 1] ?? 0
-        const chapterEnd = scriptChunkOffsets[chapterNum] ?? script.length
-        const chapterScript = script.slice(chapterStart, chapterEnd).trim().slice(0, 500)
-
-        trackEvent('Chapter Loaded', {
-          chapter_number: chapterNum,
-          chapter_script: chapterScript,
-          is_example: isExampleScript,
-        })
+        if (isKeywordMode) {
+          const chapterSegments = segments.filter((s) => (s.chapter ?? 1) === chapterNum)
+          const keywordList = chapterSegments.map((s) => s.topic)
+          trackEvent('Keywords Loaded', {
+            keyword_count: keywordList.length,
+            keywords: keywordList.join(', '),
+          })
+        } else {
+          const chapterStart = scriptChunkOffsets[chapterNum - 1] ?? 0
+          const chapterEnd = scriptChunkOffsets[chapterNum] ?? script.length
+          const chapterScript = script.slice(chapterStart, chapterEnd).trim().slice(0, 500)
+          trackEvent('Chapter Loaded', {
+            chapter_number: chapterNum,
+            chapter_script: chapterScript,
+            is_example: isExampleScript,
+          })
+        }
       } catch (err) {
         console.error(`Chapter ${chapterNum} search failed:`, err)
         setChapterStatus(chapterNum, 'idle') // allow retry
@@ -344,6 +365,53 @@ export default function ResultsPage() {
     reset()
     router.push('/')
   }
+
+  const handleAddKeyword = useCallback(async () => {
+    const kw = keywordSearchInput.trim()
+    if (!kw || isSearchingKeyword) return
+
+    trackEvent('Results — Add Keyword', { keyword: kw })
+    setKeywordSearchInput('')
+    setIsSearchingKeyword(true)
+
+    const id = `kw_${Date.now()}`
+    const newSegment: ScriptSegment = {
+      id,
+      text: kw,
+      topic: kw,
+      searchQueries: [kw],
+      startIndex: segments.length,
+      endIndex: segments.length,
+      chapter: 1,
+    }
+
+    addSegments([newSegment])
+    setLoadingSegmentIds((prev) => new Set([...prev, id]))
+    setPendingScrollSegmentId(id)
+
+    try {
+      const res = await fetch('/api/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ segments: [newSegment], orientation: videoOrientation, deductCreditsPerSegment: true }),
+      })
+      if (res.status === 402) {
+        setShowUpgradeModal(true)
+      } else if (res.ok) {
+        const { results } = await res.json()
+        addSearchResults(results)
+        setCreditsSpentThisSession((n) => n + 1)
+        refreshCredits()
+      }
+    } finally {
+      setLoadingSegmentIds((prev) => {
+        const next = new Set(prev)
+        next.delete(id)
+        return next
+      })
+      setIsSearchingKeyword(false)
+    }
+  }, [keywordSearchInput, isSearchingKeyword, segments.length, videoOrientation, addSegments, addSearchResults, refreshCredits])
 
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
 
@@ -486,7 +554,7 @@ export default function ResultsPage() {
 
       <DisclaimerBanner />
 
-      {/* Mobile: chapter pill row */}
+      {/* Mobile: chapter/keyword pill row */}
       {segments.length > 0 && (
         <div className="md:hidden bg-white/40 backdrop-blur-sm border-b border-purple-200 px-4 py-2 overflow-x-auto">
           <div className="flex gap-2" style={{ minWidth: 'max-content' }}>
@@ -501,7 +569,7 @@ export default function ResultsPage() {
                     : 'bg-purple-100 text-purple-600 hover:bg-purple-200 hover:text-purple-900',
                 ].join(' ')}
               >
-                B{i + 1}
+                {isKeywordMode ? seg.topic : `B${i + 1}`}
               </button>
             ))}
           </div>
@@ -553,8 +621,8 @@ export default function ResultsPage() {
         </div>
       )}
 
-      {/* Mobile floating action buttons */}
-      {segments.length > 0 && !scriptDrawerOpen && (
+      {/* Mobile floating action buttons — only in script mode */}
+      {!isKeywordMode && segments.length > 0 && !scriptDrawerOpen && (
         <div className="md:hidden fixed bottom-5 right-4 z-30 flex flex-col gap-2 items-end">
           <button
             onClick={() => setScriptDrawerOpen(true)}
@@ -570,8 +638,8 @@ export default function ResultsPage() {
 
       {/* Use dvh instead of vh to handle iOS Safari toolbar correctly */}
       <div className="flex flex-1 overflow-hidden" style={{ height: 'calc(100dvh - 40px)' }}>
-        {/* LEFT PANEL */}
-        <div className="hidden md:flex flex-col w-[30%] min-w-[280px] max-w-sm border-r border-purple-200 overflow-hidden bg-white/20 backdrop-blur-sm">
+        {/* LEFT PANEL — hidden in keyword mode */}
+        <div className={`flex-col w-[30%] min-w-[280px] max-w-sm border-r border-purple-200 overflow-hidden bg-white/20 backdrop-blur-sm ${isKeywordMode ? 'hidden' : 'hidden md:flex'}`}>
           <div className="px-5 py-4 border-b border-purple-200 shrink-0">
             <div className="flex items-center justify-between mb-1">
               <span className="text-[10px] uppercase tracking-widest text-purple-500 font-semibold">Your script</span>
@@ -641,7 +709,9 @@ export default function ResultsPage() {
                     : isLoading
                     ? 'Finding footage…'
                     : segments.length > 0
-                    ? `${segments.length} segments · ${allChapters.length} chapters · ${totalClips} clips loaded`
+                    ? isKeywordMode
+                      ? `${segments.length} keyword${segments.length !== 1 ? 's' : ''} · ${totalClips} clips loaded`
+                      : `${segments.length} segments · ${allChapters.length} chapter${allChapters.length !== 1 ? 's' : ''} · ${totalClips} clips loaded`
                     : 'ClipScout'}
                 </p>
                 {isLoading && (
@@ -652,7 +722,7 @@ export default function ResultsPage() {
               </div>
             </div>
             <div className="flex items-center gap-3">
-              {isAuthenticated && (
+              {isAuthenticated && !isKeywordMode && (
                 <button
                   onClick={handleSaveScript}
                   disabled={saveState === 'saving' || saveState === 'saved'}
@@ -696,6 +766,64 @@ export default function ResultsPage() {
             </div>
           </div>
 
+          {/* Keyword search bar — only shown in keyword mode */}
+          {isKeywordMode && (
+            <div className="sticky top-[52px] z-10 bg-white/60 backdrop-blur-sm border-b border-purple-200 px-6 py-2.5 shrink-0 space-y-1.5">
+              <form
+                onSubmit={(e) => { e.preventDefault(); handleAddKeyword() }}
+                className="flex items-center gap-2"
+              >
+                <div className={['flex-1 flex items-center gap-2 bg-white/80 border rounded-xl px-3 py-1.5 focus-within:ring-2 focus-within:ring-purple-400 focus-within:border-transparent transition-all', atKeywordCreditLimit ? 'border-amber-300 bg-amber-50/60' : 'border-purple-200'].join(' ')}>
+                  <svg className={['w-3.5 h-3.5 shrink-0', atKeywordCreditLimit ? 'text-amber-400' : 'text-purple-400'].join(' ')} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+                  </svg>
+                  <input
+                    type="text"
+                    value={keywordSearchInput}
+                    onChange={(e) => setKeywordSearchInput(e.target.value)}
+                    disabled={atKeywordCreditLimit}
+                    placeholder={atKeywordCreditLimit ? 'No credits remaining' : 'Search another keyword…'}
+                    className="flex-1 text-xs text-purple-950 placeholder-purple-400 bg-transparent focus:outline-none disabled:cursor-not-allowed"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={!keywordSearchInput.trim() || isSearchingKeyword || atKeywordCreditLimit}
+                  className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 disabled:bg-purple-200 disabled:text-purple-400 disabled:cursor-not-allowed text-white transition-colors shrink-0"
+                >
+                  {isSearchingKeyword ? (
+                    <>
+                      <svg className="animate-spin w-3.5 h-3.5" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                      </svg>
+                      Searching…
+                    </>
+                  ) : (
+                    'Search'
+                  )}
+                </button>
+              </form>
+
+              {/* Credit helper */}
+              {atKeywordCreditLimit ? (
+                <p className="text-[11px] text-amber-600 flex items-center gap-1.5">
+                  <svg className="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+                  </svg>
+                  You&apos;ve used all your credits.{' '}
+                  <a href="/pricing" className="font-semibold underline underline-offset-2 hover:text-amber-800 transition-colors">
+                    Buy more →
+                  </a>
+                </p>
+              ) : availableCredits !== null ? (
+                <p className={['text-[11px] flex items-center justify-end', availableCredits <= 2 ? 'text-amber-500' : 'text-purple-400'].join(' ')}>
+                  {availableCredits} credit{availableCredits !== 1 ? 's' : ''} remaining · each keyword uses 1
+                </p>
+              ) : null}
+            </div>
+          )}
+
           {/* Loading overlay — stays until chapter 1 videos are ready */}
           {isLoading && (
             <div className="flex-1 overflow-y-auto">
@@ -716,20 +844,22 @@ export default function ResultsPage() {
 
                 return (
                   <div key={chapterNum}>
-                    {/* Chapter header */}
-                    <div className="flex items-center gap-3 mb-5">
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-bold uppercase tracking-widest text-purple-600">
-                          Chapter {chapterNum}
-                        </span>
-                        {status === 'done' && (
-                          <span className="text-[9px] bg-purple-100 text-purple-600 border border-purple-200 px-1.5 py-0.5 rounded-full">
-                            {chapterSegments.length} segments · {searchResults.filter(r => chapterSegments.some(s => s.id === r.segmentId)).reduce((sum, r) => sum + r.videos.length, 0)} clips
+                    {/* Chapter header — hidden in keyword mode */}
+                    {!isKeywordMode && (
+                      <div className="flex items-center gap-3 mb-5">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] font-bold uppercase tracking-widest text-purple-600">
+                            Chapter {chapterNum}
                           </span>
-                        )}
+                          {status === 'done' && (
+                            <span className="text-[9px] bg-purple-100 text-purple-600 border border-purple-200 px-1.5 py-0.5 rounded-full">
+                              {chapterSegments.length} segments · {searchResults.filter(r => chapterSegments.some(s => s.id === r.segmentId)).reduce((sum, r) => sum + r.videos.length, 0)} clips
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex-1 h-px bg-purple-200" />
                       </div>
-                      <div className="flex-1 h-px bg-purple-200" />
-                    </div>
+                    )}
 
                     {/* Chapter content */}
                     {isVisible && (status === 'loading' || status === 'done' || status === 'idle') ? (
@@ -775,6 +905,7 @@ export default function ResultsPage() {
                               segmentNumber={segIndex + 1}
                               videos={result?.videos ?? []}
                               onIntersect={handleSegmentIntersect}
+                              onInsufficientCredits={() => setShowUpgradeModal(true)}
                             />
                           )
                         })}

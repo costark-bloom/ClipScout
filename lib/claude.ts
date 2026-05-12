@@ -187,6 +187,50 @@ Return ONLY a JSON array of 2 query strings. No markdown, no explanation.`,
   }
 }
 
+/**
+ * Generate fresh search queries for a segment that already has results,
+ * intentionally avoiding the original queries so we surface new footage.
+ */
+export async function generateMoreQueries(
+  segmentText: string,
+  topic: string,
+  existingQueries: string[]
+): Promise<string[]> {
+  try {
+    const message = await client.messages.create({
+      model: 'claude-haiku-4-5',
+      max_tokens: 200,
+      messages: [{
+        role: 'user',
+        content: `A user wants MORE stock footage options for this video segment. The existing searches already ran:
+${existingQueries.map((q) => `- "${q}"`).join('\n')}
+
+Generate 3 DIFFERENT search queries that approach the same visual topic from fresh angles (different framing, synonyms, related imagery, wider/narrower scope).
+
+Rules:
+- Describe only what the camera would literally see
+- Use broad generic terms stock footage sites carry
+- Do NOT repeat or closely paraphrase the existing queries above
+
+Topic: ${topic}
+Segment: "${segmentText.slice(0, 300)}"
+
+Return ONLY a JSON array of 3 query strings. No markdown, no explanation.`,
+      }],
+    })
+    const text = message.content[0].type === 'text' ? message.content[0].text.trim() : ''
+    const match = text.match(/\[[\s\S]*\]/)
+    if (!match) return []
+    const parsed = JSON.parse(match[0])
+    if (Array.isArray(parsed) && parsed.every((q) => typeof q === 'string')) {
+      return parsed as string[]
+    }
+    return []
+  } catch {
+    return []
+  }
+}
+
 export async function analyzeScript(script: string): Promise<ScriptSegment[]> {
   const chunks = splitIntoChunks(script)
   console.log(`[claude] split script into ${chunks.length} chunk(s)`)
