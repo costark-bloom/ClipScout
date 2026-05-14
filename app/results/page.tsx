@@ -46,6 +46,7 @@ export default function ResultsPage() {
     videoOrientation,
     isExampleScript,
     isKeywordMode,
+    keywordChipCount,
   } = useAppStore()
 
   const [loadingSegmentIds, setLoadingSegmentIds] = useState<Set<string>>(new Set())
@@ -63,6 +64,10 @@ export default function ResultsPage() {
   const [isFreeTrial, setIsFreeTrial] = useState(true)
 
   const scriptPanelRef = useRef<HTMLDivElement>(null)
+  // Tracks chapters we've already started loading so the auto-load effect can't
+  // fire twice (React 18 strict mode double-invokes effects on mount, and the
+  // chapterStatus closure inside the effect is stale on the second invocation).
+  const initiatedChaptersRef = useRef<Set<number>>(new Set())
   const videoPanelRef = useRef<HTMLDivElement>(null)
   const [pendingScrollSegmentId, setPendingScrollSegmentId] = useState<string | null>(null)
   const [visibleChapters, setVisibleChapters] = useState<number[]>([])
@@ -108,7 +113,9 @@ export default function ResultsPage() {
     if (segments.length === 0) return
     const chapter1 = allChapters[0]
     if (chapter1 === undefined) return
+    if (initiatedChaptersRef.current.has(chapter1)) return
     if (chapterStatus[chapter1]) return // already loading or done
+    initiatedChaptersRef.current.add(chapter1)
     loadChapter(chapter1)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [segments])
@@ -191,7 +198,17 @@ export default function ResultsPage() {
         const res = await fetch('/api/search', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ segments: chapterSegments, orientation: videoOrientation, deductCreditsPerSegment: isKeywordMode }),
+          body: JSON.stringify({
+            segments: chapterSegments,
+            orientation: videoOrientation,
+            deductCreditsPerSegment: isKeywordMode,
+            // In keyword mode, charge only for the chips the user originally typed —
+            // not the post-auto-split segment count. Fall back to segment count if
+            // chip count is missing (e.g. older sessions).
+            ...(isKeywordMode
+              ? { creditsToCharge: keywordChipCount > 0 ? keywordChipCount : chapterSegments.length }
+              : {}),
+          }),
         })
 
         if (!res.ok) {
@@ -232,14 +249,16 @@ export default function ResultsPage() {
         setChapterStatus(chapterNum, 'idle') // allow retry
       }
     },
-    [segments, setChapterStatus, addSearchResults, script, scriptChunkOffsets, isExampleScript, isKeywordMode, refreshCredits]
+    [segments, setChapterStatus, addSearchResults, script, scriptChunkOffsets, isExampleScript, isKeywordMode, keywordChipCount, refreshCredits]
   )
 
   const handleLoadNextChapter = (chapterNum: number) => {
     if (!visibleChapters.includes(chapterNum)) {
       setVisibleChapters((prev) => [...prev, chapterNum])
     }
+    if (initiatedChaptersRef.current.has(chapterNum)) return
     if (!chapterStatus[chapterNum] || chapterStatus[chapterNum] === 'idle') {
+      initiatedChaptersRef.current.add(chapterNum)
       loadChapter(chapterNum)
     }
   }
@@ -376,26 +395,59 @@ export default function ResultsPage() {
     setKeywordSearchInput('')
     setIsSearchingKeyword(true)
 
-    const id = `kw_${Date.now()}`
-    const newSegment: ScriptSegment = {
-      id,
-      text: kw,
-      topic: kw,
-      searchQueries: [kw],
-      startIndex: segments.length,
-      endIndex: segments.length,
-      chapter: 1,
+    // Check whether the typed keyword should be auto-split into multiple segments.
+    // The user only pays 1 credit regardless of how many segments we end up creating.
+    let parts: string[] = [kw]
+    if (kw.split(/\s+/).length > 2) {
+      try {
+        const res = await fetch('/api/keywords/split-suggest', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ keyword: kw }),
+          signal: AbortSignal.timeout(3500),
+        })
+        if (res.ok) {
+          const data = await res.json()
+          if (data.shouldSplit && Array.isArray(data.parts) && data.parts.length >= 2) {
+            parts = data.parts.slice(0, 2) as string[]
+          }
+        }
+      } catch {
+        // non-fatal — fall back to single segment
+      }
     }
 
-    addSegments([newSegment])
-    setLoadingSegmentIds((prev) => new Set([...prev, id]))
-    setPendingScrollSegmentId(id)
+    const ts = Date.now()
+    const newSegments: ScriptSegment[] = parts.map((p, i) => ({
+      id: `kw_${ts}_${i}`,
+      text: p,
+      topic: p,
+      searchQueries: [p],
+      startIndex: segments.length + i,
+      endIndex: segments.length + i,
+      chapter: 1,
+      ...(parts.length > 1 ? { originalContext: kw } : {}),
+    }))
+
+    addSegments(newSegments)
+    setLoadingSegmentIds((prev) => {
+      const next = new Set(prev)
+      for (const s of newSegments) next.add(s.id)
+      return next
+    })
+    setPendingScrollSegmentId(newSegments[0].id)
 
     try {
       const res = await fetch('/api/search', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ segments: [newSegment], orientation: videoOrientation, deductCreditsPerSegment: true }),
+        body: JSON.stringify({
+          segments: newSegments,
+          orientation: videoOrientation,
+          deductCreditsPerSegment: true,
+          // User typed one keyword — they pay 1 credit even if we auto-split it.
+          creditsToCharge: 1,
+        }),
       })
       if (res.status === 402) {
         setShowUpgradeModal(true)
@@ -408,7 +460,7 @@ export default function ResultsPage() {
     } finally {
       setLoadingSegmentIds((prev) => {
         const next = new Set(prev)
-        next.delete(id)
+        for (const s of newSegments) next.delete(s.id)
         return next
       })
       setIsSearchingKeyword(false)

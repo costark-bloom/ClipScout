@@ -116,7 +116,7 @@ export async function POST(request: NextRequest) {
   const allStock = [...dedupedPexels, ...dedupedPixabay, ...dedupedFreepik]
 
   const [enrichedStock, transcriptEnriched] = await Promise.all([
-    enrichWithMetadata(segment.text, allStock, segment.topic).catch(() => allStock),
+    enrichWithMetadata(segment.text, allStock, segment.topic, queriesToRun).catch(() => allStock),
     enrichWithTranscripts(segment.text, dedupedYoutube).catch(() => dedupedYoutube),
   ])
 
@@ -126,7 +126,7 @@ export async function POST(request: NextRequest) {
   const unscoredYoutube = transcriptEnriched.filter((v) => v.relevanceScore === undefined)
   const scoredYoutube = transcriptEnriched.filter((v) => v.relevanceScore !== undefined)
   const metadataFallback = unscoredYoutube.length > 0
-    ? await enrichWithMetadata(segment.text, unscoredYoutube, segment.topic).catch(() => unscoredYoutube)
+    ? await enrichWithMetadata(segment.text, unscoredYoutube, segment.topic, queriesToRun).catch(() => unscoredYoutube)
     : []
   const enrichedYoutube = [...scoredYoutube, ...metadataFallback]
 

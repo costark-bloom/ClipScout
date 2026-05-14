@@ -7,7 +7,7 @@ import { searchPixabay } from '@/lib/pixabay'
 import { searchFreepik } from '@/lib/freepik'
 import { enrichWithTranscripts } from '@/lib/transcript-matcher'
 import { enrichWithMetadata } from '@/lib/metadata-matcher'
-import { generateFallbackQueries } from '@/lib/claude'
+import { generateFallbackQueries, expandKeywordToEnglishQueries } from '@/lib/claude'
 import { getCreditsRemaining, deductCredit } from '@/lib/credits'
 import { supabase } from '@/lib/supabase'
 import type { ScriptSegment, SearchResults, VideoResult, VideoOrientation } from '@/lib/types'
@@ -66,7 +66,7 @@ async function searchForSegment(
   // Enrich all stock sources (Pexels + Pixabay + Freepik) in one Claude call, passing topic for sport-mismatch detection
   const allStock = [...dedupedPexels, ...dedupedPixabay, ...dedupedFreepik]
   const [enrichedStock, transcriptEnriched] = await Promise.all([
-    enrichWithMetadata(segment.text, allStock, segment.topic).catch(() => allStock),
+    enrichWithMetadata(segment.text, allStock, segment.topic, queries).catch(() => allStock),
     enrichWithTranscripts(segment.text, dedupedYoutube).catch(() => dedupedYoutube),
   ])
 
@@ -78,7 +78,7 @@ async function searchForSegment(
   const unscoredYoutube = transcriptEnriched.filter((v) => v.relevanceScore === undefined)
   const scoredYoutube = transcriptEnriched.filter((v) => v.relevanceScore !== undefined)
   const metadataFallback = unscoredYoutube.length > 0
-    ? await enrichWithMetadata(segment.text, unscoredYoutube, segment.topic).catch(() => unscoredYoutube)
+    ? await enrichWithMetadata(segment.text, unscoredYoutube, segment.topic, queries).catch(() => unscoredYoutube)
     : []
   const enrichedYoutube = [...scoredYoutube, ...metadataFallback]
 
@@ -117,7 +117,8 @@ async function searchForSegment(
       const newVideos = deduplicateByUrl(fallbackFlat.filter((v) => !existingUrls.has(v.sourceUrl)))
 
       if (newVideos.length > 0) {
-        const enrichedFallback = await enrichWithMetadata(segment.text, newVideos, segment.topic).catch(() => newVideos)
+        // Score fallback results against the fallback queries (broader visual terms) plus the original queries
+        const enrichedFallback = await enrichWithMetadata(segment.text, newVideos, segment.topic, [...queries, ...fallbackQueries]).catch(() => newVideos)
         const filteredFallback = filterLowRelevance(enrichedFallback)
         console.log(`[search] fallback found ${filteredFallback.length} usable new results for "${segment.topic}"`)
         // Merge: put fallback results alongside original, then sort
@@ -127,10 +128,24 @@ async function searchForSegment(
   }
 
   // Combine all platforms and sort by relevance score descending
-  const combined = [
+  let combined = [
     ...finalStock,
     ...filteredYoutube,
   ].sort((a, b) => (b.relevanceScore ?? -1) - (a.relevanceScore ?? -1))
+
+  // Safety net: if strict filtering produced nothing, surface the best of what we found
+  // anyway (down to score >= 0.2). Showing a few imperfect options beats showing nothing
+  // for short/niche segments where the scorer is conservative.
+  if (combined.length === 0) {
+    const allEnriched = [...enrichedPexels, ...enrichedPixabay, ...enrichedFreepik, ...enrichedYoutube]
+    const fallbackKept = allEnriched
+      .filter((v) => v.relevanceScore === undefined || v.relevanceScore >= 0.2)
+      .sort((a, b) => (b.relevanceScore ?? -1) - (a.relevanceScore ?? -1))
+    if (fallbackKept.length > 0) {
+      console.log(`[search] zero filtered results for "${segment.topic}" — surfacing ${fallbackKept.length} lower-scored candidates as safety net`)
+      combined = fallbackKept
+    }
+  }
 
   return {
     segmentId: segment.id,
@@ -162,7 +177,13 @@ export async function POST(request: NextRequest) {
       segments,
       orientation = 'both',
       deductCreditsPerSegment = false,
-    } = body as { segments: unknown; orientation?: VideoOrientation; deductCreditsPerSegment?: boolean }
+      creditsToCharge,
+    } = body as {
+      segments: unknown
+      orientation?: VideoOrientation
+      deductCreditsPerSegment?: boolean
+      creditsToCharge?: number
+    }
 
     if (!Array.isArray(segments)) {
       return NextResponse.json({ error: 'segments array is required' }, { status: 400 })
@@ -175,10 +196,16 @@ export async function POST(request: NextRequest) {
     const session = await getServerSession(authOptions)
     const userEmail = session?.user?.email ?? null
 
-    // Deduct 1 credit per segment for keyword searches (authenticated users only)
-    if (deductCreditsPerSegment && userEmail) {
+    // Credit count: if the client provides creditsToCharge, use that exact number
+    // (e.g. for keyword mode where auto-splits produce more segments than the user
+    // actually paid for). Otherwise fall back to 1 credit per segment.
+    const creditCount = typeof creditsToCharge === 'number' && creditsToCharge >= 0
+      ? creditsToCharge
+      : segments.length
+
+    if (deductCreditsPerSegment && userEmail && creditCount > 0) {
       const creditsRemaining = await getCreditsRemaining(userEmail)
-      if (creditsRemaining < segments.length) {
+      if (creditsRemaining < creditCount) {
         return NextResponse.json({ error: 'INSUFFICIENT_CREDITS' }, { status: 402 })
       }
     }
@@ -201,19 +228,44 @@ export async function POST(request: NextRequest) {
       // Non-fatal — proceed without Freepik
     }
 
+    // For keyword mode, expand each segment's search queries to English so
+    // non-English keywords still match English-indexed stock libraries.
+    let searchSegments = segments as ScriptSegment[]
+    if (deductCreditsPerSegment) {
+      searchSegments = await Promise.all(
+        (segments as ScriptSegment[]).map(async (seg) => {
+          const englishQueries = await expandKeywordToEnglishQueries(
+            seg.searchQueries[0] ?? seg.text,
+            seg.originalContext
+          )
+          // Also update text/topic to English so relevance scoring and fallback
+          // query generation both operate on English, not the original foreign text.
+          const englishText = englishQueries[0] ?? seg.text
+          return {
+            ...seg,
+            searchQueries: englishQueries,
+            text: englishText,
+            topic: englishText,
+          }
+        })
+      )
+    }
+
     // Process max 3 segments concurrently
     const results = await withConcurrencyLimit(
-      segments as ScriptSegment[],
+      searchSegments,
       3,
       (segment) => searchForSegment(segment, freepikApiKey, orientation)
     )
 
     // Deduct credits after a successful search
-    if (deductCreditsPerSegment && userEmail) {
-      await Promise.all(
-        (segments as ScriptSegment[]).map(() => deductCredit(userEmail))
-      )
-      console.log(`[credits] deducted ${segments.length} credit(s) for ${userEmail} (keyword search)`)
+    if (deductCreditsPerSegment && userEmail && creditCount > 0) {
+      const deductPromises = [] as Promise<unknown>[]
+      for (let i = 0; i < creditCount; i++) {
+        deductPromises.push(deductCredit(userEmail))
+      }
+      await Promise.all(deductPromises)
+      console.log(`[credits] deducted ${creditCount} credit(s) for ${userEmail} (keyword search, ${segments.length} segment(s))`)
     }
 
     return NextResponse.json({ results })

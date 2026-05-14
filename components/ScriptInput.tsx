@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import useAppStore from '@/store/useAppStore'
@@ -39,7 +39,7 @@ export default function ScriptInput() {
     showUpgradeModal, setShowUpgradeModal,
     setScriptChunks, setSavedScriptContext,
     videoOrientation, setVideoOrientation,
-    setIsExampleScript, setIsKeywordMode,
+    setIsExampleScript, setIsKeywordMode, setKeywordChipCount,
   } = useAppStore()
 
   const [inputMode, setInputMode] = useState<InputMode>('keywords')
@@ -72,7 +72,7 @@ export default function ScriptInput() {
 
   // ── Keyword helpers ──────────────────────────────────────────────────────
 
-  const addKeywordsFromString = useCallback((raw: string) => {
+  const addKeywordsFromString = (raw: string) => {
     const parsed = raw
       .split(/[,\n]+/)
       .map((k) => k.trim())
@@ -81,11 +81,10 @@ export default function ScriptInput() {
     setKeywords((prev) => {
       const existing = new Set(prev.map((k) => k.toLowerCase()))
       const fresh = parsed.filter((k) => !existing.has(k.toLowerCase()))
-      // Respect credit limit for authenticated users
       const available = keywordLimit !== null ? Math.max(0, keywordLimit - prev.length) : fresh.length
       return [...prev, ...fresh.slice(0, available)]
     })
-  }, [keywordLimit])
+  }
 
   const handleKeywordKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' || e.key === ',') {
@@ -204,7 +203,48 @@ export default function ScriptInput() {
 
   // ── Keywords submit ──────────────────────────────────────────────────────
 
-  const handleKeywordsSubmit = () => {
+  /**
+   * For each chip, check if it should be auto-split into multiple keywords.
+   * Returns an array of { kw, originalContext? } items — where `originalContext`
+   * is set to the unsplit chip text when the chip was split (so search can use
+   * it as fallback context for translation).
+   * Runs all checks in parallel with a short timeout to keep submit snappy.
+   */
+  const autoSplitChips = async (chips: string[]): Promise<Array<{ kw: string; originalContext?: string }>> => {
+    const results = await Promise.all(
+      chips.map(async (chip) => {
+        const wordCount = chip.trim().split(/\s+/).length
+        if (wordCount <= 2) return { parts: [chip], original: chip }
+        try {
+          const res = await fetch('/api/keywords/split-suggest', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ keyword: chip }),
+            signal: AbortSignal.timeout(3500),
+          })
+          if (!res.ok) return { parts: [chip], original: chip }
+          const data = await res.json()
+          if (data.shouldSplit && Array.isArray(data.parts) && data.parts.length >= 2) {
+            return { parts: data.parts.slice(0, 2) as string[], original: chip }
+          }
+          return { parts: [chip], original: chip }
+        } catch {
+          return { parts: [chip], original: chip }
+        }
+      })
+    )
+    const expanded: Array<{ kw: string; originalContext?: string }> = []
+    for (const { parts, original } of results) {
+      if (parts.length > 1) {
+        for (const p of parts) expanded.push({ kw: p, originalContext: original })
+      } else {
+        expanded.push({ kw: parts[0] })
+      }
+    }
+    return expanded
+  }
+
+  const handleKeywordsSubmit = async () => {
     // Flush any partially typed keyword first
     const finalKeywords = [...keywords]
     if (keywordInput.trim()) {
@@ -221,28 +261,40 @@ export default function ScriptInput() {
 
     if (finalKeywords.length === 0 || isSubmitting) return
 
+    // Original chip count drives credit charging — auto-splits stay free
+    const originalChipCount = finalKeywords.length
+
+    setIsSubmitting(true)
+
+    // Run split detection in parallel before navigating
+    const expanded = await autoSplitChips(finalKeywords)
+
     trackEvent('Home — Keywords Search', {
-      keyword_count: finalKeywords.length,
+      keyword_count: originalChipCount,
+      segment_count: expanded.length,
+      auto_split_used: expanded.length > originalChipCount,
       video_orientation: videoOrientation,
     })
 
-    setIsSubmitting(true)
     reset()
     setIsKeywordMode(true)
     setIsExampleScript(false)
+    setKeywordChipCount(originalChipCount)
 
-    const keywordString = finalKeywords.join(', ')
+    const keywordString = expanded.map((e) => e.kw).join(', ')
     setScript(keywordString)
     setScriptChunks([0], 1)
 
-    const kwSegments = finalKeywords.map((kw, i) => ({
-      id: `kw_${i}_${Date.now()}`,
+    const ts = Date.now()
+    const kwSegments = expanded.map(({ kw, originalContext }, i) => ({
+      id: `kw_${i}_${ts}`,
       text: kw,
       topic: kw,
       searchQueries: [kw],
       startIndex: i,
       endIndex: i,
       chapter: 1,
+      ...(originalContext ? { originalContext } : {}),
     }))
     addSegments(kwSegments)
 
@@ -300,7 +352,7 @@ The app will identify every visually descriptive moment — like 'towering skysc
         ) : (
           /* ── Keywords mode ── */
           <div
-            className="min-h-[120px] bg-white/60 border border-purple-200 rounded-xl px-4 py-3 flex flex-col gap-3 focus-within:ring-2 focus-within:ring-purple-400 focus-within:border-transparent transition-all duration-200 backdrop-blur-sm cursor-text"
+            className="min-h-[120px] bg-white/60 border border-purple-200 rounded-xl px-4 pt-2 pb-3 flex flex-col gap-3 focus-within:ring-2 focus-within:ring-purple-400 focus-within:border-transparent transition-all duration-200 backdrop-blur-sm cursor-text"
             onClick={() => keywordInputRef.current?.focus()}
           >
             {/* Chips */}
@@ -337,10 +389,10 @@ The app will identify every visually descriptive moment — like 'towering skysc
                 atKeywordLimit
                   ? 'Keyword limit reached'
                   : keywords.length === 0
-                  ? 'Type a keyword and press Enter — e.g. sunset beach, city traffic, coffee shop…'
+                  ? 'Type a keyword and press Enter…'
                   : 'Add another keyword…'
               }
-              className="flex-1 bg-transparent text-purple-950 placeholder-purple-400 text-sm focus:outline-none min-w-[200px] disabled:cursor-not-allowed"
+              className="flex-1 bg-transparent text-purple-950 placeholder-purple-400 text-sm focus:outline-none min-w-[200px] disabled:cursor-not-allowed py-0"
             />
 
             {/* Credit limit helper */}
@@ -367,12 +419,7 @@ The app will identify every visually descriptive moment — like 'towering skysc
                 </p>
               </div>
             ) : (
-              <div className="space-y-1">
-                <p className="text-[11px] text-purple-500 italic">Tip: the more descriptive your keywords, the better the results — e.g. "golden hour beach waves" beats "beach".</p>
-                <p className="text-[11px] text-purple-400">
-                  Press <kbd className="bg-purple-100 border border-purple-200 px-1 py-0.5 rounded text-[10px]">Enter</kbd> or <kbd className="bg-purple-100 border border-purple-200 px-1 py-0.5 rounded text-[10px]">,</kbd> after each keyword · Each keyword gets its own set of clips
-                </p>
-              </div>
+              <p className="text-[11px] text-purple-500 italic">Tip: the more descriptive your keywords, the better the results — e.g. "golden hour beach waves" beats "beach".</p>
             )}
           </div>
         )}

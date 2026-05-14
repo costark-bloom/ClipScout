@@ -15,7 +15,8 @@ interface ClaudeMatch {
 async function matchMetadataWithClaude(
   segmentText: string,
   videos: VideoResult[],
-  topic?: string
+  topic?: string,
+  searchQueries?: string[]
 ): Promise<ClaudeMatch[]> {
   if (videos.length === 0) return []
 
@@ -27,20 +28,27 @@ async function matchMetadataWithClaude(
     .join('\n\n---\n\n')
 
   const topicLine = topic ? `\nSEGMENT TOPIC: "${topic}"\n` : ''
+  // The search queries describe the EXACT visual the creator is looking for —
+  // critical context when the segment text itself is short or vague (e.g. "marched his way up").
+  const queriesLine = searchQueries && searchQueries.length > 0
+    ? `\nDESIRED VISUALS (what the creator is searching for):\n${searchQueries.map((q) => `- ${q}`).join('\n')}\n`
+    : ''
 
   const prompt = `You are a video research assistant helping a content creator find B-roll stock footage.
 
 SCRIPT SEGMENT (what the creator is narrating):
-"${segmentText}"${topicLine}
+"${segmentText}"${topicLine}${queriesLine}
 
 Below are stock footage clips. Each clip is described by its title and tags — there is no transcript since these are silent stock clips.
 
-For each clip, score how visually relevant it is to the script segment — meaning: would this footage work well as B-roll playing while the creator narrates those words?
+For each clip, score how visually relevant it is to the DESIRED VISUALS above (when provided) or the script segment otherwise — meaning: would this footage work well as B-roll playing while the creator narrates those words?
+
+IMPORTANT: When the script segment text is short or vague (e.g. just a few words like "marched his way up"), weight the DESIRED VISUALS heavily — they describe what the creator actually wants to see. Do NOT penalize a clip for failing to literally depict the brief narration text if it clearly matches the desired visuals.
 
 CRITICAL SCORING RULE — WRONG SPORT/ACTIVITY PENALTY:
 If the script segment describes a specific sport or physical activity (e.g. American football, basketball, soccer, rugby, swimming, boxing), and a clip clearly shows a DIFFERENT sport or activity, score it 0.1 or lower — no exceptions. Showing the wrong sport as B-roll is worse than having no footage at all. For example: if the segment is about American football but the video shows rugby players, score it ≤ 0.1.
 
-Score 1.0 = perfect visual match for this narration
+Score 1.0 = perfect visual match for what the creator wants
 Score 0.7–0.9 = strong match — clearly shows the right activity/context
 Score 0.4–0.6 = partial match — related theme but not a great fit
 Score 0.1–0.3 = weak or misleading match
@@ -78,13 +86,14 @@ ${videoDescriptions}`
 export async function enrichWithMetadata(
   segmentText: string,
   videos: VideoResult[],
-  topic?: string
+  topic?: string,
+  searchQueries?: string[]
 ): Promise<VideoResult[]> {
   if (videos.length === 0) return []
 
   let matches: ClaudeMatch[] = []
   try {
-    matches = await matchMetadataWithClaude(segmentText, videos, topic)
+    matches = await matchMetadataWithClaude(segmentText, videos, topic, searchQueries)
   } catch (err) {
     console.warn('Metadata enrichment failed, using raw results:', err)
     return videos

@@ -6,6 +6,7 @@ export interface ScriptSegment {
   startIndex: number
   endIndex: number
   chapter: number  // 1-based chapter number assigned by Claude
+  originalContext?: string  // for keyword splits: the unsplit phrase, used to improve translation
 }
 
 export type VideoLicense = 'royalty-free' | 'creative-commons' | 'standard' | 'unknown'
@@ -48,8 +49,11 @@ export interface AppState {
   error: string | null
   videoOrientation: VideoOrientation
   isKeywordMode: boolean
+  /** Number of keyword chips the user originally typed (before auto-splitting), used for credit charging */
+  keywordChipCount: number
   setVideoOrientation: (orientation: VideoOrientation) => void
   setIsKeywordMode: (value: boolean) => void
+  setKeywordChipCount: (count: number) => void
   setScript: (script: string) => void
   setSegments: (segments: ScriptSegment[]) => void
   addSegments: (segments: ScriptSegment[]) => void

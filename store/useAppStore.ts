@@ -31,11 +31,13 @@ const useAppStore = create<AppStateWithHydration>()(
       videoOrientation: 'both' as VideoOrientation,
       isExampleScript: false,
       isKeywordMode: false,
+      keywordChipCount: 0,
 
       setHasHydrated: (value: boolean) => set({ _hasHydrated: value }),
       setShowUpgradeModal: (value: boolean) => set({ showUpgradeModal: value }),
       setIsExampleScript: (value: boolean) => set({ isExampleScript: value }),
       setIsKeywordMode: (value: boolean) => set({ isKeywordMode: value }),
+      setKeywordChipCount: (count: number) => set({ keywordChipCount: count }),
       setVideoOrientation: (orientation: VideoOrientation) => set({ videoOrientation: orientation }),
       setScriptChunks: (offsets: number[], count: number) =>
         set({ scriptChunkOffsets: offsets, scriptChunkCount: count }),
@@ -94,6 +96,7 @@ const useAppStore = create<AppStateWithHydration>()(
           showUpgradeModal: false,
           isExampleScript: false,
           isKeywordMode: false,
+          keywordChipCount: 0,
           scriptChunkOffsets: [],
           scriptChunkCount: 1,
           savedScriptContext: '',
@@ -113,6 +116,7 @@ const useAppStore = create<AppStateWithHydration>()(
         videoOrientation: state.videoOrientation,
         isExampleScript: state.isExampleScript,
         isKeywordMode: state.isKeywordMode,
+        keywordChipCount: state.keywordChipCount,
       }),
       onRehydrateStorage: () => (state) => {
         state?.setHasHydrated(true)
