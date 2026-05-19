@@ -15,6 +15,7 @@ import type { ScriptSegment, VideoResult, VideoOrientation } from '@/lib/types'
 export const maxDuration = 60
 
 const MAX_PER_SOURCE = 4
+const MAX_PER_SOURCE_LITERAL = 8
 const MAX_RESULTS = 12
 
 function deduplicateByUrl(videos: VideoResult[], excludeUrls: Set<string>): VideoResult[] {
@@ -23,6 +24,22 @@ function deduplicateByUrl(videos: VideoResult[], excludeUrls: Set<string>): Vide
     if (seen.has(v.sourceUrl) || excludeUrls.has(v.sourceUrl)) return false
     seen.add(v.sourceUrl)
     return true
+  })
+}
+
+/**
+ * For literal-match segments, only keep videos whose title or tags mention the
+ * entity (case + punctuation insensitive). Mirrors the same helper in /api/search.
+ */
+function filterByEntityReference(videos: VideoResult[], entityName: string): VideoResult[] {
+  const needle = entityName.toLowerCase().replace(/[^a-z0-9 ]/g, '').trim()
+  if (!needle) return videos
+  return videos.filter((v) => {
+    const haystack = [v.title, ...(v.tags ?? [])]
+      .join(' ')
+      .toLowerCase()
+      .replace(/[^a-z0-9 ]/g, ' ')
+    return haystack.includes(needle)
   })
 }
 
@@ -70,11 +87,14 @@ export async function POST(request: NextRequest) {
     // non-fatal
   }
 
-  // Generate fresh queries that differ from the ones already run
+  // Generate fresh queries that differ from the ones already run.
+  // Pass literal-match flag so brand-specific queries stay brand-specific
+  // (otherwise the generator defaults to broad generic terms).
   const freshQueries = await generateMoreQueries(
     segment.text,
     segment.topic,
-    segment.searchQueries
+    segment.searchQueries,
+    segment.requiresLiteralMatch
   )
 
   // Fall back to slightly varied versions of existing queries if Claude fails
@@ -108,16 +128,42 @@ export async function POST(request: NextRequest) {
     else freepikResults.push(...results)
   })
 
-  const dedupedPexels = deduplicateByUrl(pexelsResults, excludeUrls).slice(0, MAX_PER_SOURCE)
-  const dedupedPixabay = deduplicateByUrl(pixabayResults, excludeUrls).slice(0, MAX_PER_SOURCE)
-  const dedupedYoutube = deduplicateByUrl(youtubeResults, excludeUrls).slice(0, MAX_PER_SOURCE)
-  const dedupedFreepik = deduplicateByUrl(freepikResults, excludeUrls).slice(0, MAX_PER_SOURCE)
+  let processedPexels = deduplicateByUrl(pexelsResults, excludeUrls)
+  let processedPixabay = deduplicateByUrl(pixabayResults, excludeUrls)
+  let processedYoutube = deduplicateByUrl(youtubeResults, excludeUrls)
+  let processedFreepik = deduplicateByUrl(freepikResults, excludeUrls)
+
+  const perSourceCap = segment.requiresLiteralMatch ? MAX_PER_SOURCE_LITERAL : MAX_PER_SOURCE
+
+  if (segment.requiresLiteralMatch) {
+    const entityName = segment.topic || segment.text
+    const beforePex = processedPexels.length
+    const beforePix = processedPixabay.length
+    const beforeFp = processedFreepik.length
+    // Strict filter for stock libraries only — they don't carry trademarked content.
+    // YouTube is unfiltered so Claude scoring can evaluate relevance from transcripts/titles.
+    processedPexels = filterByEntityReference(processedPexels, entityName)
+    processedPixabay = filterByEntityReference(processedPixabay, entityName)
+    processedFreepik = filterByEntityReference(processedFreepik, entityName)
+    console.log(
+      `[search/more] literal-match entity-filter for "${entityName}": ` +
+      `Pexels ${processedPexels.length}/${beforePex}, ` +
+      `Pixabay ${processedPixabay.length}/${beforePix}, ` +
+      `YouTube ${processedYoutube.length} (unfiltered — relies on Claude scoring), ` +
+      `Freepik ${processedFreepik.length}/${beforeFp}`
+    )
+  }
+
+  const dedupedPexels = processedPexels.slice(0, perSourceCap)
+  const dedupedPixabay = processedPixabay.slice(0, perSourceCap)
+  const dedupedYoutube = processedYoutube.slice(0, perSourceCap)
+  const dedupedFreepik = processedFreepik.slice(0, perSourceCap)
 
   const allStock = [...dedupedPexels, ...dedupedPixabay, ...dedupedFreepik]
 
   const [enrichedStock, transcriptEnriched] = await Promise.all([
-    enrichWithMetadata(segment.text, allStock, segment.topic, queriesToRun).catch(() => allStock),
-    enrichWithTranscripts(segment.text, dedupedYoutube).catch(() => dedupedYoutube),
+    enrichWithMetadata(segment.text, allStock, segment.topic, queriesToRun, segment.requiresLiteralMatch).catch(() => allStock),
+    enrichWithTranscripts(segment.text, dedupedYoutube, segment.requiresLiteralMatch).catch(() => dedupedYoutube),
   ])
 
   const filterLowRelevance = (videos: VideoResult[]) =>
@@ -126,7 +172,7 @@ export async function POST(request: NextRequest) {
   const unscoredYoutube = transcriptEnriched.filter((v) => v.relevanceScore === undefined)
   const scoredYoutube = transcriptEnriched.filter((v) => v.relevanceScore !== undefined)
   const metadataFallback = unscoredYoutube.length > 0
-    ? await enrichWithMetadata(segment.text, unscoredYoutube, segment.topic, queriesToRun).catch(() => unscoredYoutube)
+    ? await enrichWithMetadata(segment.text, unscoredYoutube, segment.topic, queriesToRun, segment.requiresLiteralMatch).catch(() => unscoredYoutube)
     : []
   const enrichedYoutube = [...scoredYoutube, ...metadataFallback]
 

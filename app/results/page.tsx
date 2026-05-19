@@ -221,7 +221,20 @@ export default function ResultsPage() {
           throw new Error(err.error || 'Search failed')
         }
 
-        const { results } = await res.json()
+        const { results, segments: updatedSegments } = await res.json()
+        // Persist server-side enrichment (canonical topic/text, requiresLiteralMatch)
+        // back into the client store so follow-up calls like /api/search/more know
+        // this segment is a literal-match keyword.
+        if (Array.isArray(updatedSegments)) {
+          for (const s of updatedSegments as ScriptSegment[]) {
+            updateSegment(s.id, {
+              topic: s.topic,
+              text: s.text,
+              searchQueries: s.searchQueries,
+              requiresLiteralMatch: s.requiresLiteralMatch,
+            })
+          }
+        }
         addSearchResults(results)
         setChapterStatus(chapterNum, 'done')
 
@@ -452,7 +465,17 @@ export default function ResultsPage() {
       if (res.status === 402) {
         setShowUpgradeModal(true)
       } else if (res.ok) {
-        const { results } = await res.json()
+        const { results, segments: updatedSegments } = await res.json()
+        if (Array.isArray(updatedSegments)) {
+          for (const s of updatedSegments as ScriptSegment[]) {
+            updateSegment(s.id, {
+              topic: s.topic,
+              text: s.text,
+              searchQueries: s.searchQueries,
+              requiresLiteralMatch: s.requiresLiteralMatch,
+            })
+          }
+        }
         addSearchResults(results)
         setCreditsSpentThisSession((n) => n + 1)
         refreshCredits()

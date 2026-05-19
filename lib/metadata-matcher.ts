@@ -16,7 +16,8 @@ async function matchMetadataWithClaude(
   segmentText: string,
   videos: VideoResult[],
   topic?: string,
-  searchQueries?: string[]
+  searchQueries?: string[],
+  requiresLiteralMatch?: boolean
 ): Promise<ClaudeMatch[]> {
   if (videos.length === 0) return []
 
@@ -34,10 +35,27 @@ async function matchMetadataWithClaude(
     ? `\nDESIRED VISUALS (what the creator is searching for):\n${searchQueries.map((q) => `- ${q}`).join('\n')}\n`
     : ''
 
+  // For literal-match segments, stock platforms are pre-filtered for entity references
+  // but YouTube is not (its titles often describe the action rather than the brand).
+  // So Claude must still verify entity references from title/tags directly.
+  const literalMatchSection = requiresLiteralMatch
+    ? `\nLITERAL MATCH REQUIRED:
+This segment is about a SPECIFIC named entity (brand, sports team, public figure, named place, or product — e.g. "Arby's", "Indianapolis Colts", "Elon Musk", "Times Square"). The creator wants footage that's actually about THAT specific entity, not generic same-category alternatives.
+
+Score from textual evidence (title + tags only — you cannot see the video):
+- Title or tags name the entity (any reasonable spelling, e.g. "Arby's", "Arbys", "ARBY'S") → 0.7–0.9
+- Tags include the entity even if title doesn't → 0.5–0.7
+- Title describes the right activity/setting BUT for a DIFFERENT same-category entity (e.g. "Burger King drive thru" when looking for Arby's; "Patriots highlights" when looking for the Colts) → 0.0–0.1
+- Generic stock clip with no specific entity referenced (e.g. "fast food drive thru", "businessman speaking") → 0.0–0.1
+- Title might be describing the entity indirectly (e.g. "drive-thru without a car" on a channel that does Arby's reviews) — give benefit of the doubt → 0.3–0.5
+
+Showing the WRONG brand/team/person as B-roll is misleading; better to score generic clips low than risk false matches.\n`
+    : ''
+
   const prompt = `You are a video research assistant helping a content creator find B-roll stock footage.
 
 SCRIPT SEGMENT (what the creator is narrating):
-"${segmentText}"${topicLine}${queriesLine}
+"${segmentText}"${topicLine}${queriesLine}${literalMatchSection}
 
 Below are stock footage clips. Each clip is described by its title and tags — there is no transcript since these are silent stock clips.
 
@@ -87,13 +105,14 @@ export async function enrichWithMetadata(
   segmentText: string,
   videos: VideoResult[],
   topic?: string,
-  searchQueries?: string[]
+  searchQueries?: string[],
+  requiresLiteralMatch?: boolean
 ): Promise<VideoResult[]> {
   if (videos.length === 0) return []
 
   let matches: ClaudeMatch[] = []
   try {
-    matches = await matchMetadataWithClaude(segmentText, videos, topic, searchQueries)
+    matches = await matchMetadataWithClaude(segmentText, videos, topic, searchQueries, requiresLiteralMatch)
   } catch (err) {
     console.warn('Metadata enrichment failed, using raw results:', err)
     return videos

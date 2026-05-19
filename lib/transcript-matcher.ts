@@ -88,7 +88,8 @@ async function fetchTranscript(videoId: string): Promise<TranscriptLine[] | null
 // Ask Claude to score and timestamp-match all transcripts against the script segment
 async function matchTranscriptsWithClaude(
   segmentText: string,
-  transcripts: VideoTranscript[]
+  transcripts: VideoTranscript[],
+  requiresLiteralMatch?: boolean
 ): Promise<ClaudeMatch[]> {
   if (transcripts.length === 0) return []
 
@@ -99,10 +100,24 @@ async function matchTranscriptsWithClaude(
     })
     .join('\n\n---\n\n')
 
+  const literalMatchSection = requiresLiteralMatch
+    ? `\nLITERAL MATCH REQUIRED:
+This segment is about a SPECIFIC named entity (brand, sports team, public figure, named place, or product — e.g. "Arby's", "Indianapolis Colts", "Elon Musk", "Times Square"). The creator wants footage that's actually about THAT specific entity, not generic alternatives in the same category.
+
+Score based on textual evidence in the transcript:
+- Transcript repeatedly references the entity (e.g. a review, vlog, news segment, or game commentary about it) → 0.7–1.0
+- Transcript mentions the entity at least once meaningfully (the video is partly about it) → 0.5–0.7
+- Transcript only references the entity in passing while focused on something else → 0.3–0.5
+- Transcript doesn't reference the entity at all → 0.0–0.2
+- Transcript is about a DIFFERENT same-category entity (rival brand, different team, another person) → 0.0–0.1
+
+Trust the transcript — if the entity comes up multiple times, the video is almost certainly about it.\n`
+    : ''
+
   const prompt = `You are a video research assistant helping a content creator find B-roll footage.
 
 SCRIPT SEGMENT (what the creator is narrating):
-"${segmentText}"
+"${segmentText}"${literalMatchSection}
 
 Below are transcripts from YouTube videos found by searching for this segment. For each video:
 1. Score how visually relevant it is to the script segment (0.0 = completely irrelevant, 1.0 = perfect match)
@@ -143,7 +158,8 @@ ${transcriptBlocks}`
 // Main export — enriches YouTube VideoResults with transcript-based relevance + timestamps
 export async function enrichWithTranscripts(
   segmentText: string,
-  youtubeResults: VideoResult[]
+  youtubeResults: VideoResult[],
+  requiresLiteralMatch?: boolean
 ): Promise<VideoResult[]> {
   if (youtubeResults.length === 0) return []
 
@@ -174,7 +190,7 @@ export async function enrichWithTranscripts(
   }
 
   // One Claude call for all transcripts vs. this segment
-  const matches = await matchTranscriptsWithClaude(segmentText, withTranscripts)
+  const matches = await matchTranscriptsWithClaude(segmentText, withTranscripts, requiresLiteralMatch)
 
   const matchMap = new Map<string, ClaudeMatch>()
   for (const m of matches) matchMap.set(m.videoId, m)

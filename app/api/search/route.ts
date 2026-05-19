@@ -7,12 +7,13 @@ import { searchPixabay } from '@/lib/pixabay'
 import { searchFreepik } from '@/lib/freepik'
 import { enrichWithTranscripts } from '@/lib/transcript-matcher'
 import { enrichWithMetadata } from '@/lib/metadata-matcher'
-import { generateFallbackQueries, expandKeywordToEnglishQueries } from '@/lib/claude'
+import { generateFallbackQueries, prepareKeywordForSearch } from '@/lib/claude'
 import { getCreditsRemaining, deductCredit } from '@/lib/credits'
 import { supabase } from '@/lib/supabase'
 import type { ScriptSegment, SearchResults, VideoResult, VideoOrientation } from '@/lib/types'
 
 const MAX_PER_SOURCE = 3
+const MAX_PER_SOURCE_LITERAL = 8  // brand/person/place searches deserve more candidates
 const MAX_PER_SEGMENT = 12
 
 function deduplicateByUrl(videos: VideoResult[]): VideoResult[] {
@@ -21,6 +22,25 @@ function deduplicateByUrl(videos: VideoResult[]): VideoResult[] {
     if (seen.has(v.sourceUrl)) return false
     seen.add(v.sourceUrl)
     return true
+  })
+}
+
+/**
+ * For literal-match segments, only keep videos whose title or tags mention the
+ * entity. Generic same-category clips that don't reference the entity by name
+ * are misleading B-roll — better to show nothing than to show "Burger King"
+ * footage for an "Arby's" search.
+ */
+function filterByEntityReference(videos: VideoResult[], entityName: string): VideoResult[] {
+  // Strip punctuation for fuzzy matching: "Arby's" → "arbys", "Tesla Model 3" → "tesla model 3"
+  const needle = entityName.toLowerCase().replace(/[^a-z0-9 ]/g, '').trim()
+  if (!needle) return videos
+  return videos.filter((v) => {
+    const haystack = [v.title, ...(v.tags ?? [])]
+      .join(' ')
+      .toLowerCase()
+      .replace(/[^a-z0-9 ]/g, ' ')
+    return haystack.includes(needle)
   })
 }
 
@@ -58,16 +78,48 @@ async function searchForSegment(
     else freepikResults.push(...results)
   })
 
-  const dedupedPexels = deduplicateByUrl(pexelsResults).slice(0, MAX_PER_SOURCE)
-  const dedupedPixabay = deduplicateByUrl(pixabayResults).slice(0, MAX_PER_SOURCE)
-  const dedupedYoutube = deduplicateByUrl(youtubeResults).slice(0, MAX_PER_SOURCE)
-  const dedupedFreepik = deduplicateByUrl(freepikResults).slice(0, MAX_PER_SOURCE)
+  // For literal-match segments (brands, people, sports teams, places), apply a
+  // deterministic entity-name filter BEFORE the per-source cap. This way we keep
+  // the top brand-matching results instead of arbitrary first-N.
+  let processedPexels = deduplicateByUrl(pexelsResults)
+  let processedPixabay = deduplicateByUrl(pixabayResults)
+  let processedYoutube = deduplicateByUrl(youtubeResults)
+  let processedFreepik = deduplicateByUrl(freepikResults)
+
+  const perSourceCap = segment.requiresLiteralMatch ? MAX_PER_SOURCE_LITERAL : MAX_PER_SOURCE
+
+  if (segment.requiresLiteralMatch) {
+    const entityName = segment.topic || segment.text
+    const beforePex = processedPexels.length
+    const beforePix = processedPixabay.length
+    const beforeFp = processedFreepik.length
+    // Strict filter for stock libraries — they genuinely don't carry trademarked
+    // content, so anything that comes back without the entity name is generic noise.
+    processedPexels = filterByEntityReference(processedPexels, entityName)
+    processedPixabay = filterByEntityReference(processedPixabay, entityName)
+    processedFreepik = filterByEntityReference(processedFreepik, entityName)
+    // DON'T filter YouTube — its search algorithm + Claude scoring handles relevance
+    // well, and the title-match filter is too strict (titles often describe the action,
+    // e.g. "Drive-thru without a car" instead of mentioning the brand explicitly).
+    console.log(
+      `[search] literal-match entity-filter for "${entityName}": ` +
+      `Pexels ${processedPexels.length}/${beforePex}, ` +
+      `Pixabay ${processedPixabay.length}/${beforePix}, ` +
+      `YouTube ${processedYoutube.length} (unfiltered — relies on Claude scoring), ` +
+      `Freepik ${processedFreepik.length}/${beforeFp}`
+    )
+  }
+
+  const dedupedPexels = processedPexels.slice(0, perSourceCap)
+  const dedupedPixabay = processedPixabay.slice(0, perSourceCap)
+  const dedupedYoutube = processedYoutube.slice(0, perSourceCap)
+  const dedupedFreepik = processedFreepik.slice(0, perSourceCap)
 
   // Enrich all stock sources (Pexels + Pixabay + Freepik) in one Claude call, passing topic for sport-mismatch detection
   const allStock = [...dedupedPexels, ...dedupedPixabay, ...dedupedFreepik]
   const [enrichedStock, transcriptEnriched] = await Promise.all([
-    enrichWithMetadata(segment.text, allStock, segment.topic, queries).catch(() => allStock),
-    enrichWithTranscripts(segment.text, dedupedYoutube).catch(() => dedupedYoutube),
+    enrichWithMetadata(segment.text, allStock, segment.topic, queries, segment.requiresLiteralMatch).catch(() => allStock),
+    enrichWithTranscripts(segment.text, dedupedYoutube, segment.requiresLiteralMatch).catch(() => dedupedYoutube),
   ])
 
   const enrichedPexels = enrichedStock.filter((v) => v.platform === 'pexels')
@@ -78,7 +130,7 @@ async function searchForSegment(
   const unscoredYoutube = transcriptEnriched.filter((v) => v.relevanceScore === undefined)
   const scoredYoutube = transcriptEnriched.filter((v) => v.relevanceScore !== undefined)
   const metadataFallback = unscoredYoutube.length > 0
-    ? await enrichWithMetadata(segment.text, unscoredYoutube, segment.topic, queries).catch(() => unscoredYoutube)
+    ? await enrichWithMetadata(segment.text, unscoredYoutube, segment.topic, queries, segment.requiresLiteralMatch).catch(() => unscoredYoutube)
     : []
   const enrichedYoutube = [...scoredYoutube, ...metadataFallback]
 
@@ -118,7 +170,13 @@ async function searchForSegment(
 
       if (newVideos.length > 0) {
         // Score fallback results against the fallback queries (broader visual terms) plus the original queries
-        const enrichedFallback = await enrichWithMetadata(segment.text, newVideos, segment.topic, [...queries, ...fallbackQueries]).catch(() => newVideos)
+        const enrichedFallback = await enrichWithMetadata(
+          segment.text,
+          newVideos,
+          segment.topic,
+          [...queries, ...fallbackQueries],
+          segment.requiresLiteralMatch
+        ).catch(() => newVideos)
         const filteredFallback = filterLowRelevance(enrichedFallback)
         console.log(`[search] fallback found ${filteredFallback.length} usable new results for "${segment.topic}"`)
         // Merge: put fallback results alongside original, then sort
@@ -234,18 +292,23 @@ export async function POST(request: NextRequest) {
     if (deductCreditsPerSegment) {
       searchSegments = await Promise.all(
         (segments as ScriptSegment[]).map(async (seg) => {
-          const englishQueries = await expandKeywordToEnglishQueries(
+          const { queries: englishQueries, requiresLiteralMatch, canonicalName } = await prepareKeywordForSearch(
             seg.searchQueries[0] ?? seg.text,
             seg.originalContext
           )
-          // Also update text/topic to English so relevance scoring and fallback
-          // query generation both operate on English, not the original foreign text.
-          const englishText = englishQueries[0] ?? seg.text
+          // For literal entities (brands, people, places) keep the topic as the canonical
+          // name so the UI and scorer both retain entity identity. For concept keywords,
+          // use the first English query as text/topic so translation correctly propagates
+          // through scoring + fallback query generation.
+          const englishText = requiresLiteralMatch
+            ? (canonicalName ?? seg.text)
+            : (englishQueries[0] ?? seg.text)
           return {
             ...seg,
             searchQueries: englishQueries,
             text: englishText,
             topic: englishText,
+            requiresLiteralMatch,
           }
         })
       )
@@ -268,7 +331,11 @@ export async function POST(request: NextRequest) {
       console.log(`[credits] deducted ${creditCount} credit(s) for ${userEmail} (keyword search, ${segments.length} segment(s))`)
     }
 
-    return NextResponse.json({ results })
+    // Also return the (possibly enriched) segments so the client can persist
+    // server-side metadata like requiresLiteralMatch and the canonical topic/text.
+    // This is critical for follow-up calls (e.g. /api/search/more) so they know
+    // the segment is a brand/literal match without re-classifying.
+    return NextResponse.json({ results, segments: searchSegments })
   } catch (error) {
     console.error('Search route error:', error)
     const message = error instanceof Error ? error.message : 'Failed to search videos'

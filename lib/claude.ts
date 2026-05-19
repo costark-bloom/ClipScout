@@ -246,58 +246,115 @@ async function translateToEnglish(text: string): Promise<string | null> {
   }
 }
 
-export async function expandKeywordToEnglishQueries(keyword: string, originalContext?: string): Promise<string[]> {
-  try {
-    // Detect non-Latin script (non-English) — only translate when needed
-    const hasNonLatin = /[^\u0000-\u007F]/.test(keyword)
+export interface KeywordExpansion {
+  queries: string[]
+  /** True when the keyword refers to a specific named entity (brand/company/person/place/product) */
+  requiresLiteralMatch: boolean
+  /** Canonical display form, e.g. "arbys" → "Arby's" — only set for literal entities */
+  canonicalName?: string
+}
 
-    let englishMeaning = keyword
+/**
+ * Expand a user-typed keyword into 2-3 English stock footage search queries.
+ *
+ * Detects whether the keyword refers to a SPECIFIC named entity (a brand,
+ * company, person, product, or place) vs. a generic concept. For literal
+ * entities, the queries include the entity name verbatim so YouTube/stock
+ * search actually surfaces brand-specific content, and the segment is
+ * flagged so the relevance scorer rejects look-alike alternatives.
+ */
+export async function prepareKeywordForSearch(
+  keyword: string,
+  originalContext?: string
+): Promise<KeywordExpansion> {
+  try {
+    // Translate non-Latin keywords first — Google Translate handles slang/idioms correctly.
+    const hasNonLatin = /[^\u0000-\u007F]/.test(keyword)
+    let textForAnalysis = keyword
     if (hasNonLatin) {
-      // Translate the keyword itself — Google Translate handles slang/idioms correctly.
-      // If translation fails AND we have a longer original phrase, try that as a fallback
-      // since longer text gives the translator more context to disambiguate.
       const translated = await translateToEnglish(keyword)
       if (translated) {
-        englishMeaning = translated
+        textForAnalysis = translated
       } else if (originalContext && originalContext !== keyword) {
         const ctxTranslated = await translateToEnglish(originalContext)
-        if (ctxTranslated) englishMeaning = ctxTranslated
+        if (ctxTranslated) textForAnalysis = ctxTranslated
       }
     }
-    console.log(`[expandKeyword] "${keyword}" → "${englishMeaning}"`)
+    console.log(`[expandKeyword] "${keyword}" → "${textForAnalysis}"`)
 
-    // Generate stock footage search queries from the (now English) meaning
+    // Single Claude call: classify entity type + generate appropriate queries
     const message = await client.messages.create({
       model: 'claude-haiku-4-5',
-      max_tokens: 150,
+      max_tokens: 300,
       messages: [{
         role: 'user',
-        content: `Generate 2-3 English search queries for finding stock footage on Pexels, Pixabay, and YouTube that matches this concept:
+        content: `Analyze this keyword and generate 2-3 English search queries optimised for finding B-roll on Pexels, Pixabay, and YouTube.
 
-"${englishMeaning}"
+Step 1 — Classify the keyword:
+- "literal" — a specific NAMED ENTITY the user wants to see on screen literally. This includes:
+  • Brands / companies (Arby's, McDonald's, Tesla, Apple, Nike)
+  • Sports teams / leagues / clubs (Indianapolis Colts, Manchester United, Lakers, NBA, NFL, Premier League)
+  • Public figures (Elon Musk, Taylor Swift, LeBron James, presidents, athletes by name)
+  • Schools / universities (Harvard, Notre Dame, Michigan Wolverines)
+  • Named places (Times Square, Mount Everest, Eiffel Tower, Las Vegas Strip)
+  • Product lines / specific models (iPhone 15, Tesla Model 3, PlayStation 5)
+  • Music acts, TV shows, movies, franchises (The Beatles, Stranger Things, Marvel)
+- "concept" — anything else. Activities, emotions, generic categories, common objects, generic places (a forest, a city), or generic activities (football in general — but NOT a specific team). Examples: cooking, sunset, fast food, hiking, party, dragons.
 
-Rules:
-- Describe what the camera would literally see (people, actions, settings, objects)
-- Use broad, stockable terms — avoid proper nouns unless world-famous
-- Each query should be a distinct visual angle on the same concept
+Rule of thumb: if a Wikipedia article would exist for this exact phrase, it's likely "literal".
 
-Return ONLY a JSON array of 2-3 English query strings. No markdown, no explanation.`,
+Step 2 — Generate queries based on classification:
+
+If "literal", queries MUST include the entity name verbatim. The user wants to see THAT specific entity, not generic alternatives. Examples:
+- "arbys" → {"type":"literal","canonicalName":"Arby's","queries":["Arby's restaurant storefront exterior","Arby's roast beef sandwich curly fries food","Arby's drive thru sign location"]}
+- "indianapolis colts" → {"type":"literal","canonicalName":"Indianapolis Colts","queries":["Indianapolis Colts NFL football game highlights","Indianapolis Colts Lucas Oil Stadium home game","Indianapolis Colts players blue uniform field"]}
+- "elon musk speaking" → {"type":"literal","canonicalName":"Elon Musk","queries":["Elon Musk speaking at conference podium","Elon Musk interview close up talking","Elon Musk Tesla SpaceX presentation"]}
+- "times square" → {"type":"literal","canonicalName":"Times Square","queries":["Times Square New York City crowds","Times Square at night billboards lights","Times Square aerial wide shot"]}
+
+If "concept", queries describe what the camera would literally see using broad stockable terms (NO proper nouns). Examples:
+- "fast food" → {"type":"concept","queries":["fast food restaurant counter customers","burger fries soda food close up","drive thru window order pickup"]}
+- "football" (generic sport, no team) → {"type":"concept","queries":["american football game tackle play","football quarterback throwing pass stadium","football helmet uniform close up huddle"]}
+- "sunset over ocean" → {"type":"concept","queries":["golden hour ocean horizon waves","sunset reflecting on sea water","tropical beach sunset wide shot"]}
+
+Keyword: "${textForAnalysis}"
+
+Return ONLY valid JSON in the format shown above. No markdown, no explanation.`,
       }],
     })
 
     const raw = message.content[0].type === 'text' ? message.content[0].text.trim() : ''
-    const match = raw.match(/\[[\s\S]*\]/)
-    if (!match) return [englishMeaning]
-    const parsed = JSON.parse(match[0])
-    if (Array.isArray(parsed) && parsed.every((q) => typeof q === 'string') && parsed.length > 0) {
-      console.log(`[expandKeyword] queries for "${englishMeaning}": ${JSON.stringify(parsed)}`)
-      return parsed as string[]
+    const match = raw.match(/\{[\s\S]*\}/)
+    if (!match) {
+      return { queries: [textForAnalysis], requiresLiteralMatch: false }
     }
-    return [englishMeaning]
+
+    const parsed = JSON.parse(match[0]) as { type?: string; canonicalName?: string; queries?: unknown }
+    const queries = Array.isArray(parsed.queries) && parsed.queries.every((q) => typeof q === 'string')
+      ? (parsed.queries as string[])
+      : null
+    if (!queries || queries.length === 0) {
+      return { queries: [textForAnalysis], requiresLiteralMatch: false }
+    }
+
+    const requiresLiteralMatch = parsed.type === 'literal'
+    const canonicalName = requiresLiteralMatch && typeof parsed.canonicalName === 'string' ? parsed.canonicalName : undefined
+    console.log(
+      `[expandKeyword] queries for "${textForAnalysis}" [${requiresLiteralMatch ? `literal:${canonicalName ?? '?'}` : 'concept'}]: ${JSON.stringify(queries)}`
+    )
+    return { queries, requiresLiteralMatch, canonicalName }
   } catch (err) {
     console.error('[expandKeyword] error:', err)
-    return [keyword]
+    return { queries: [keyword], requiresLiteralMatch: false }
   }
+}
+
+/**
+ * @deprecated Use {@link prepareKeywordForSearch} instead — returns richer metadata
+ * (entity classification + canonical name) needed for literal-match scoring.
+ */
+export async function expandKeywordToEnglishQueries(keyword: string, originalContext?: string): Promise<string[]> {
+  const { queries } = await prepareKeywordForSearch(keyword, originalContext)
+  return queries
 }
 
 /**
@@ -307,9 +364,14 @@ Return ONLY a JSON array of 2-3 English query strings. No markdown, no explanati
 export async function generateMoreQueries(
   segmentText: string,
   topic: string,
-  existingQueries: string[]
+  existingQueries: string[],
+  requiresLiteralMatch?: boolean
 ): Promise<string[]> {
   try {
+    const literalSection = requiresLiteralMatch
+      ? `\nIMPORTANT: This segment is about the SPECIFIC named entity "${topic}". Every query you generate MUST include the entity name verbatim — the user wants more footage of THAT entity, not generic alternatives. Do NOT generate generic category queries (e.g. "fast food restaurant" when the entity is "Arby's").\n`
+      : '\n- Describe only what the camera would literally see\n- Use broad generic terms stock footage sites carry\n'
+
     const message = await client.messages.create({
       model: 'claude-haiku-4-5',
       max_tokens: 200,
@@ -319,10 +381,8 @@ export async function generateMoreQueries(
 ${existingQueries.map((q) => `- "${q}"`).join('\n')}
 
 Generate 3 DIFFERENT search queries that approach the same visual topic from fresh angles (different framing, synonyms, related imagery, wider/narrower scope).
-
+${literalSection}
 Rules:
-- Describe only what the camera would literally see
-- Use broad generic terms stock footage sites carry
 - Do NOT repeat or closely paraphrase the existing queries above
 
 Topic: ${topic}

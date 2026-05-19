@@ -7,6 +7,12 @@ export interface ScriptSegment {
   endIndex: number
   chapter: number  // 1-based chapter number assigned by Claude
   originalContext?: string  // for keyword splits: the unsplit phrase, used to improve translation
+  /**
+   * When true, the segment refers to a specific named entity (brand, company,
+   * person, product, place) and only clips that visibly show that exact entity
+   * should be scored as relevant. Generic same-category clips are penalised.
+   */
+  requiresLiteralMatch?: boolean
 }
 
 export type VideoLicense = 'royalty-free' | 'creative-commons' | 'standard' | 'unknown'
@@ -63,7 +69,7 @@ export interface AppState {
   setIsAnalyzing: (value: boolean) => void
   setIsSearching: (value: boolean) => void
   setChapterStatus: (chapter: number, status: ChapterStatus) => void
-  updateSegment: (id: string, updates: Partial<Pick<ScriptSegment, 'topic' | 'searchQueries'>>) => void
+  updateSegment: (id: string, updates: Partial<Pick<ScriptSegment, 'topic' | 'searchQueries' | 'text' | 'requiresLiteralMatch'>>) => void
   appendVideosToSegment: (segmentId: string, newVideos: VideoResult[]) => void
   setError: (error: string | null) => void
   reset: () => void
