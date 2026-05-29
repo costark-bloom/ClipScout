@@ -6,6 +6,7 @@ import type { VideoResult } from '@/lib/types'
 import { getReuseScore, TIER_COLORS } from '@/lib/reuse-score'
 import { trackEvent } from '@/lib/analytics'
 import VideoPreview from './VideoPreview'
+import DownloadButton from './DownloadButton'
 
 interface VideoCardProps {
   video: VideoResult
@@ -178,6 +179,7 @@ export default function VideoCard({ video }: VideoCardProps) {
               </svg>
               Source
             </a>
+            <DownloadButton video={video} variant="icon" />
           </div>
         </div>
       </div>

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react'
 import type { VideoResult } from '@/lib/types'
+import DownloadButton from './DownloadButton'
 
 interface VideoPreviewProps {
   video: VideoResult
@@ -122,8 +123,8 @@ export default function VideoPreview({ video, onClose }: VideoPreviewProps) {
         </div>
 
         {/* Footer meta */}
-        <div className="px-4 py-3 flex items-center justify-between">
-          <div className="text-xs text-gray-500 space-y-0.5">
+        <div className="px-4 py-3 flex items-start justify-between gap-4">
+          <div className="text-xs text-gray-500 space-y-0.5 min-w-0">
             {video.channelOrAuthor && <p>By {video.channelOrAuthor}</p>}
             {video.duration && <p>Duration: {video.duration}</p>}
             {video.startTimestamp != null && video.startTimestamp > 0 && (
@@ -132,9 +133,12 @@ export default function VideoPreview({ video, onClose }: VideoPreviewProps) {
               </p>
             )}
           </div>
-          <p className="text-[10px] text-gray-600 max-w-xs text-right">
-            Preview only. Verify licensing before use.
-          </p>
+          <div className="flex flex-col items-end gap-2 shrink-0">
+            <DownloadButton video={video} variant="pill" />
+            <p className="text-[10px] text-gray-600 max-w-xs text-right">
+              Preview only. Verify licensing before use.
+            </p>
+          </div>
         </div>
       </div>
     </div>

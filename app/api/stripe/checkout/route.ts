@@ -10,10 +10,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'You must be signed in to subscribe.' }, { status: 401 })
     }
 
-    const { planId, interval, packId } = (await req.json()) as {
+    const { planId, interval, packId, firstMonthPromo } = (await req.json()) as {
       planId: PlanId
       interval: BillingInterval
       packId?: string | null
+      firstMonthPromo?: boolean
     }
 
     const priceId = PRICE_IDS[planId]?.[interval]
@@ -31,6 +32,16 @@ export async function POST(req: NextRequest) {
       lineItems.push({ price: PACK_PRICE_IDS[packId], quantity: 1 })
     }
 
+    // First-month promo: server-side gate. Ignore the client flag unless plan +
+    // interval match the promo combination (Creator + monthly). This is the real
+    // restriction — Stripe's product-level limit is just a backup layer.
+    const isPromoEligible = firstMonthPromo === true && planId === 'creator' && interval === 'monthly'
+    const promoCouponId = process.env.STRIPE_FIRST_MONTH_COUPON_ID
+    const applyPromo = isPromoEligible && !!promoCouponId
+    if (isPromoEligible && !promoCouponId) {
+      console.warn('[stripe/checkout] firstMonthPromo requested but STRIPE_FIRST_MONTH_COUPON_ID is not set')
+    }
+
     const checkoutSession = await stripe.checkout.sessions.create({
       mode: 'subscription',
       line_items: lineItems,
@@ -39,17 +50,24 @@ export async function POST(req: NextRequest) {
         userEmail: session.user.email,
         planId,
         interval,
+        firstMonthPromo: applyPromo ? 'true' : 'false',
       },
       subscription_data: {
         metadata: {
           userEmail: session.user.email,
           planId,
           interval,
+          firstMonthPromo: applyPromo ? 'true' : 'false',
         },
       },
       success_url: `${baseUrl}/pricing/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${baseUrl}/pricing`,
-      allow_promotion_codes: true,
+      // Stripe forbids setting both `discounts` and `allow_promotion_codes` —
+      // when we auto-apply the new-user coupon, the manual promo-code field
+      // disappears (which is what we want for that flow anyway).
+      ...(applyPromo
+        ? { discounts: [{ coupon: promoCouponId }] }
+        : { allow_promotion_codes: true }),
     })
 
     return NextResponse.json({ url: checkoutSession.url })

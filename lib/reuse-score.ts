@@ -7,10 +7,13 @@ export interface ReuseScore {
   tier: 'safe' | 'caution' | 'risky'
 }
 
-// Base scores by license type
+// Base scores by license type. YouTube's "Creative Commons" option is always
+// CC BY 3.0 — a permissive license that allows reuse with attribution, so it
+// lands in the safe tier alongside royalty-free stock. The tooltip still
+// reminds users about the attribution requirement.
 const LICENSE_SCORES: Record<VideoLicense, number> = {
   'royalty-free': 97,
-  'creative-commons': 72,
+  'creative-commons': 85,
   'standard': 18,
   'unknown': 22,
 }

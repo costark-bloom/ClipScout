@@ -7,7 +7,6 @@ import useAppStore from '@/store/useAppStore'
 import InteractiveScript from '@/components/InteractiveScript'
 import SegmentCard from '@/components/SegmentCard'
 import LoadingState from '@/components/LoadingState'
-import DisclaimerBanner from '@/components/DisclaimerBanner'
 import AuthGate, { useAuthGate } from '@/components/AuthGate'
 import UserMenu from '@/components/UserMenu'
 import UpgradeModal from '@/components/UpgradeModal'
@@ -404,6 +403,13 @@ export default function ResultsPage() {
     const kw = keywordSearchInput.trim()
     if (!kw || isSearchingKeyword) return
 
+    // Soft credit gate: surface the upgrade modal immediately if the user is
+    // out of credits, rather than firing the request and waiting for a 402.
+    if (availableCredits !== null && availableCredits <= 0) {
+      setShowUpgradeModal(true)
+      return
+    }
+
     trackEvent('Results — Add Keyword', { keyword: kw })
     setKeywordSearchInput('')
     setIsSearchingKeyword(true)
@@ -488,7 +494,7 @@ export default function ResultsPage() {
       })
       setIsSearchingKeyword(false)
     }
-  }, [keywordSearchInput, isSearchingKeyword, segments.length, videoOrientation, addSegments, addSearchResults, refreshCredits])
+  }, [keywordSearchInput, isSearchingKeyword, segments.length, videoOrientation, addSegments, addSearchResults, refreshCredits, availableCredits, setShowUpgradeModal, updateSegment])
 
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
 
@@ -628,8 +634,6 @@ export default function ResultsPage() {
 
       {/* Page content — blurred when gate is showing */}
       <div className={showGate ? 'pointer-events-none select-none filter blur-sm brightness-50 transition-all duration-300' : 'transition-all duration-300'}>
-
-      <DisclaimerBanner />
 
       {/* Mobile: chapter/keyword pill row */}
       {segments.length > 0 && (
@@ -850,22 +854,21 @@ export default function ResultsPage() {
                 onSubmit={(e) => { e.preventDefault(); handleAddKeyword() }}
                 className="flex items-center gap-2"
               >
-                <div className={['flex-1 flex items-center gap-2 bg-white/80 border rounded-xl px-3 py-1.5 focus-within:ring-2 focus-within:ring-purple-400 focus-within:border-transparent transition-all', atKeywordCreditLimit ? 'border-amber-300 bg-amber-50/60' : 'border-purple-200'].join(' ')}>
-                  <svg className={['w-3.5 h-3.5 shrink-0', atKeywordCreditLimit ? 'text-amber-400' : 'text-purple-400'].join(' ')} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <div className="flex-1 flex items-center gap-2 bg-white/80 border border-purple-200 rounded-xl px-3 py-1.5 focus-within:ring-2 focus-within:ring-purple-400 focus-within:border-transparent transition-all">
+                  <svg className="w-3.5 h-3.5 shrink-0 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
                   </svg>
                   <input
                     type="text"
                     value={keywordSearchInput}
                     onChange={(e) => setKeywordSearchInput(e.target.value)}
-                    disabled={atKeywordCreditLimit}
-                    placeholder={atKeywordCreditLimit ? 'No credits remaining' : 'Search another keyword…'}
-                    className="flex-1 text-xs text-purple-950 placeholder-purple-400 bg-transparent focus:outline-none disabled:cursor-not-allowed"
+                    placeholder="Search another keyword…"
+                    className="flex-1 text-xs text-purple-950 placeholder-purple-400 bg-transparent focus:outline-none"
                   />
                 </div>
                 <button
                   type="submit"
-                  disabled={!keywordSearchInput.trim() || isSearchingKeyword || atKeywordCreditLimit}
+                  disabled={!keywordSearchInput.trim() || isSearchingKeyword}
                   className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 disabled:bg-purple-200 disabled:text-purple-400 disabled:cursor-not-allowed text-white transition-colors shrink-0"
                 >
                   {isSearchingKeyword ? (

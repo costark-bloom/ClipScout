@@ -43,7 +43,15 @@ const PACKS: Pack[] = [
 interface Props {
   planName: string
   billingLabel: string
+  /** The price charged for the plan portion of this checkout. When a
+   *  first-month promo is active, pass the discounted price here AND set
+   *  `promoFirstMonth` so the order summary shows the strikethrough. */
   planPrice: number
+  /** First-month-promo metadata. When provided, the order summary highlights
+   *  the deal and shows the post-promo recurring price. */
+  promoFirstMonth?: {
+    regularPrice: number  // crossed out next to the discounted price
+  }
   onCheckout: (packId: string | null) => void
   onBack: () => void
   loading: boolean
@@ -53,6 +61,7 @@ export default function CreditBoostModal({
   planName,
   billingLabel,
   planPrice,
+  promoFirstMonth,
   onCheckout,
   onBack,
   loading,
@@ -159,12 +168,34 @@ export default function CreditBoostModal({
 
             <div className="space-y-2 flex-1">
               <div className="flex items-start justify-between gap-2">
-                <div>
+                <div className="min-w-0">
                   <p className="text-sm font-semibold text-purple-950">{planName}</p>
-                  <p className="text-xs text-purple-400">{billingLabel}</p>
+                  <p className="text-xs text-purple-400">
+                    {promoFirstMonth
+                      ? `First month — then $${promoFirstMonth.regularPrice}/month after`
+                      : billingLabel}
+                  </p>
                 </div>
-                <p className="text-sm font-semibold text-purple-950">${planPrice}</p>
+                <div className="text-right shrink-0">
+                  {promoFirstMonth && (
+                    <p className="text-xs text-purple-400 line-through leading-none">
+                      ${promoFirstMonth.regularPrice}
+                    </p>
+                  )}
+                  <p className={`text-sm font-semibold ${promoFirstMonth ? 'text-amber-600 mt-0.5' : 'text-purple-950'}`}>
+                    ${planPrice}
+                  </p>
+                </div>
               </div>
+
+              {promoFirstMonth && (
+                <p className="text-[11px] text-amber-700 font-medium bg-amber-50 border border-amber-200 rounded-md px-2 py-1.5 flex items-start gap-1.5">
+                  <svg className="w-3 h-3 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                  <span>New user first-month promo applied</span>
+                </p>
+              )}
 
               {pack && (
                 <div className="flex items-center justify-between gap-2 pt-1">

@@ -54,7 +54,6 @@ export default function ScriptInput() {
   const { credits } = useCredits()
   // null = unauthenticated (no limit enforced — guests are free up to auth gate)
   const keywordLimit = credits !== null ? credits : null
-  const atKeywordLimit = keywordLimit !== null && keywords.length >= keywordLimit
   const remainingSlots = keywordLimit !== null ? Math.max(0, keywordLimit - keywords.length) : null
 
   const showExampleTooltip = isGuest && !tooltipDismissed && !localScript && inputMode === 'script'
@@ -81,8 +80,8 @@ export default function ScriptInput() {
     setKeywords((prev) => {
       const existing = new Set(prev.map((k) => k.toLowerCase()))
       const fresh = parsed.filter((k) => !existing.has(k.toLowerCase()))
-      const available = keywordLimit !== null ? Math.max(0, keywordLimit - prev.length) : fresh.length
-      return [...prev, ...fresh.slice(0, available)]
+      // Credits are checked at submit time — never block typing/pasting here.
+      return [...prev, ...fresh]
     })
   }
 
@@ -264,6 +263,14 @@ export default function ScriptInput() {
     // Original chip count drives credit charging — auto-splits stay free
     const originalChipCount = finalKeywords.length
 
+    // Soft credit gate: if the signed-in user doesn't have enough credits for
+    // every keyword they typed, surface the upgrade modal instead of submitting.
+    // Anonymous users (keywordLimit === null) are unaffected — auth gate handles them.
+    if (keywordLimit !== null && originalChipCount > keywordLimit) {
+      setShowUpgradeModal(true)
+      return
+    }
+
     setIsSubmitting(true)
 
     // Run split detection in parallel before navigating
@@ -384,37 +391,25 @@ The app will identify every visually descriptive moment — like 'towering skysc
               onChange={(e) => setKeywordInput(e.target.value)}
               onKeyDown={handleKeywordKeyDown}
               onBlur={handleKeywordInputBlur}
-              disabled={atKeywordLimit}
               placeholder={
-                atKeywordLimit
-                  ? 'Keyword limit reached'
-                  : keywords.length === 0
+                keywords.length === 0
                   ? 'Type a keyword and press Enter…'
                   : 'Add another keyword…'
               }
-              className="flex-1 bg-transparent text-purple-950 placeholder-purple-400 text-sm focus:outline-none min-w-[200px] disabled:cursor-not-allowed py-0"
+              className="flex-1 bg-transparent text-purple-950 placeholder-purple-400 text-sm focus:outline-none min-w-[200px] py-0"
             />
 
-            {/* Credit limit helper */}
-            {atKeywordLimit ? (
-              <p className="text-[11px] text-amber-600 flex items-center gap-1.5">
-                <svg className="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
-                </svg>
-                You've used all {keywordLimit} of your credits.{' '}
-                <a href="/pricing" className="font-semibold underline underline-offset-2 hover:text-amber-800 transition-colors">
-                  Buy more →
-                </a>
-              </p>
-            ) : remainingSlots !== null ? (
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-[11px] text-purple-500 italic">Tip: the more descriptive your keywords, the better the results — e.g. "golden hour beach waves" beats "beach".</p>
+            {/* Credit helper — informational only. Search button is never blocked;
+                the upgrade modal is surfaced on click if credits are insufficient. */}
+            {remainingSlots !== null ? (
+              <div className="flex items-center justify-end md:justify-between gap-3">
+                <p className="hidden md:block text-[11px] text-purple-500 italic">Tip: the more descriptive your keywords, the better the results — e.g. "golden hour beach waves" beats "beach".</p>
                 <span className={['text-[11px] font-semibold shrink-0', remainingSlots <= 2 ? 'text-amber-500' : 'text-purple-400'].join(' ')}>
                   {remainingSlots} credit{remainingSlots !== 1 ? 's' : ''} remaining
                 </span>
               </div>
             ) : (
-              <p className="text-[11px] text-purple-500 italic">Tip: the more descriptive your keywords, the better the results — e.g. "golden hour beach waves" beats "beach".</p>
+              <p className="hidden md:block text-[11px] text-purple-500 italic">Tip: the more descriptive your keywords, the better the results — e.g. "golden hour beach waves" beats "beach".</p>
             )}
           </div>
         )}
