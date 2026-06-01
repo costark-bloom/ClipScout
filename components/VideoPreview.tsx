@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import type { VideoResult } from '@/lib/types'
 import DownloadButton from './DownloadButton'
 
@@ -25,6 +26,13 @@ const PLATFORM_LABELS = {
 
 export default function VideoPreview({ video, onClose }: VideoPreviewProps) {
   const overlayRef = useRef<HTMLDivElement>(null)
+  // Portal to document.body so `position: fixed` isn't trapped by an ancestor's
+  // `backdrop-filter` / `transform` / `filter` (e.g. VideoCard uses backdrop-blur).
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
@@ -38,7 +46,9 @@ export default function VideoPreview({ video, onClose }: VideoPreviewProps) {
     if (e.target === overlayRef.current) onClose()
   }
 
-  return (
+  if (!mounted) return null
+
+  const overlay = (
     <div
       ref={overlayRef}
       onClick={handleOverlayClick}
@@ -143,4 +153,6 @@ export default function VideoPreview({ video, onClose }: VideoPreviewProps) {
       </div>
     </div>
   )
+
+  return createPortal(overlay, document.body)
 }

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 
 interface Props {
   /** YouTube watch URL — will be pre-populated in ytdownloader.io */
@@ -58,10 +59,16 @@ export default function YouTubeDownloadWarningModal({
   onContinue,
 }: Props) {
   const [dontShowAgain, setDontShowAgain] = useState(false)
+  // Portal-mount flag: we can't call createPortal until after hydration since
+  // `document` is undefined on the server. Without the portal the modal renders
+  // inside the VideoCard, which has `backdrop-blur` and traps `position: fixed`.
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   // Close on Esc — keeps keyboard UX consistent with other modals.
-  // The ref dance lets the listener read the latest checkbox state without
-  // re-binding on every toggle.
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose(dontShowAgain)
@@ -70,7 +77,9 @@ export default function YouTubeDownloadWarningModal({
     return () => window.removeEventListener('keydown', handler)
   }, [onClose, dontShowAgain])
 
-  return (
+  if (!mounted) return null
+
+  const modal = (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="yt-download-warning-title">
       <div className="absolute inset-0 bg-purple-950/40 backdrop-blur-sm" onClick={() => onClose(dontShowAgain)} />
 
@@ -158,4 +167,6 @@ export default function YouTubeDownloadWarningModal({
       </div>
     </div>
   )
+
+  return createPortal(modal, document.body)
 }
