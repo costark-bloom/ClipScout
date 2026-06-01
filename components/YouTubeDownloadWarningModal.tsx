@@ -18,7 +18,7 @@ interface Props {
 const DOWNLOADER_BASE = 'https://ytdownloader.io/'
 // YouTube's own page explaining fair use — the most authoritative source for
 // what counts as transformative use of someone else's video on YouTube.
-const FAIR_USE_DOCS_URL = 'https://www.youtube.com/howyoutubeworks/policies/copyright/fair-use/'
+const FAIR_USE_DOCS_URL = 'https://support.google.com/youtube/answer/9783148'
 
 // localStorage key — versioned (v1) so if we ever materially change the modal
 // copy we can re-prompt users by bumping the version.
