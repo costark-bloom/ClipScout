@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import useAppStore from '@/store/useAppStore'
 import UpgradeModal from '@/components/UpgradeModal'
+import SourceFilter from '@/components/SourceFilter'
 import { splitIntoChunks } from '@/lib/chunks'
 import { trackEvent } from '@/lib/analytics'
 import { useCredits } from '@/hooks/useCredits'
@@ -442,6 +443,9 @@ The app will identify every visually descriptive moment — like 'towering skysc
             ))}
           </div>
         </div>
+
+        {/* Source filter */}
+        <SourceFilter variant="inline" analyticsContext="Home" />
 
         <div className="flex items-center gap-3">
           <button

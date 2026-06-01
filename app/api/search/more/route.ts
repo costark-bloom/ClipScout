@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/app/api/auth/[...nextauth]/route'
-import { searchYouTube } from '@/lib/youtube'
+import { searchYouTube, type YouTubeLicenseMode } from '@/lib/youtube'
 import { searchPexels } from '@/lib/pexels'
 import { searchPixabay } from '@/lib/pixabay'
 import { searchFreepik } from '@/lib/freepik'
@@ -10,7 +10,17 @@ import { enrichWithMetadata } from '@/lib/metadata-matcher'
 import { generateMoreQueries } from '@/lib/claude'
 import { getCreditsRemaining, deductCredit } from '@/lib/credits'
 import { supabase } from '@/lib/supabase'
-import type { ScriptSegment, VideoResult, VideoOrientation } from '@/lib/types'
+import type { ScriptSegment, VideoResult, VideoOrientation, VideoSource } from '@/lib/types'
+import { ALL_VIDEO_SOURCES } from '@/lib/types'
+
+function youtubeModeFor(sources: VideoSource[]): YouTubeLicenseMode | null {
+  const wantsCc = sources.includes('youtube_cc')
+  const wantsStandard = sources.includes('youtube_protected')
+  if (wantsCc && wantsStandard) return 'all'
+  if (wantsCc) return 'cc'
+  if (wantsStandard) return 'standard'
+  return null
+}
 
 export const maxDuration = 60
 
@@ -62,15 +72,27 @@ export async function POST(request: NextRequest) {
     segment,
     orientation = 'both',
     excludeUrls: rawExclude = [],
+    enabledSources: rawSources,
   } = body as {
     segment: ScriptSegment
     orientation?: VideoOrientation
     excludeUrls?: string[]
+    enabledSources?: VideoSource[]
   }
 
   if (!segment?.id || !segment?.text) {
     return NextResponse.json({ error: 'segment is required' }, { status: 400 })
   }
+
+  const enabledSources: VideoSource[] = Array.isArray(rawSources) && rawSources.length > 0
+    ? rawSources.filter((s): s is VideoSource => ALL_VIDEO_SOURCES.includes(s as VideoSource))
+    : [...ALL_VIDEO_SOURCES]
+  const finalSources = enabledSources.length > 0 ? enabledSources : [...ALL_VIDEO_SOURCES]
+
+  const pexelsOn = finalSources.includes('pexels')
+  const pixabayOn = finalSources.includes('pixabay')
+  const ytMode = youtubeModeFor(finalSources)
+  const ytFetchCount = ytMode === 'standard' ? 10 : 5
 
   const excludeUrls = new Set<string>(rawExclude)
 
@@ -105,9 +127,15 @@ export async function POST(request: NextRequest) {
   const pixabayPerPage = orientation === 'vertical' ? 12 : 6
 
   const allPromises = queriesToRun.flatMap((query) => [
-    searchPexels(query, 6, orientation).catch(() => [] as VideoResult[]),
-    searchPixabay(query, pixabayPerPage, orientation).catch(() => [] as VideoResult[]),
-    searchYouTube(query, 5).catch(() => [] as VideoResult[]),
+    pexelsOn
+      ? searchPexels(query, 6, orientation).catch(() => [] as VideoResult[])
+      : Promise.resolve([] as VideoResult[]),
+    pixabayOn
+      ? searchPixabay(query, pixabayPerPage, orientation).catch(() => [] as VideoResult[])
+      : Promise.resolve([] as VideoResult[]),
+    ytMode
+      ? searchYouTube(query, ytFetchCount, ytMode).catch(() => [] as VideoResult[])
+      : Promise.resolve([] as VideoResult[]),
     freepikApiKey
       ? searchFreepik(query, freepikApiKey, 5).catch(() => [] as VideoResult[])
       : Promise.resolve([] as VideoResult[]),

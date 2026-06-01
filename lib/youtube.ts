@@ -134,7 +134,22 @@ async function fetchWithKeyRotation(buildUrl: (key: string) => string): Promise<
   return null
 }
 
-export async function searchYouTube(query: string, maxResults = 5): Promise<VideoResult[]> {
+/**
+ * Controls YouTube license filtering at the API level.
+ * - 'all'      : no license filter — returns CC + standard mixed (matches Pre-filter behaviour)
+ * - 'cc'       : YouTube search restricted to Creative Commons via videoLicense=creativeCommon
+ * - 'standard' : no API filter (YouTube has no "non-CC only" param), but we drop CC results in post-processing
+ *
+ * 'standard' callers should fetch more candidates than they need since
+ * the API doesn't pre-filter and some results will be dropped.
+ */
+export type YouTubeLicenseMode = 'all' | 'cc' | 'standard'
+
+export async function searchYouTube(
+  query: string,
+  maxResults = 5,
+  licenseMode: YouTubeLicenseMode = 'all'
+): Promise<VideoResult[]> {
   const keys = getApiKeys()
   if (keys.length === 0) {
     console.warn('No YOUTUBE_API_KEY set, skipping YouTube search')
@@ -150,6 +165,7 @@ export async function searchYouTube(query: string, maxResults = 5): Promise<Vide
       q: query,
       key,
     })
+    if (licenseMode === 'cc') searchParams.set('videoLicense', 'creativeCommon')
     return `https://www.googleapis.com/youtube/v3/search?${searchParams}`
   })
 
@@ -180,7 +196,7 @@ export async function searchYouTube(query: string, maxResults = 5): Promise<Vide
     // Non-fatal — we'll just skip chapter/duration enrichment
   }
 
-  return data.items.map((item) => {
+  const mapped = data.items.map((item) => {
     const videoId = item.id.videoId
     const thumbnail =
       item.snippet.thumbnails.high?.url ||
@@ -216,4 +232,11 @@ export async function searchYouTube(query: string, maxResults = 5): Promise<Vide
       startTimestamp,
     }
   })
+
+  // YouTube has no "non-CC only" API filter, so when the caller wants
+  // standard-license clips only, drop CC ones post-hoc.
+  if (licenseMode === 'standard') {
+    return mapped.filter((v) => v.license !== 'creative-commons')
+  }
+  return mapped
 }

@@ -10,13 +10,30 @@ import LoadingState from '@/components/LoadingState'
 import AuthGate, { useAuthGate } from '@/components/AuthGate'
 import UserMenu from '@/components/UserMenu'
 import UpgradeModal from '@/components/UpgradeModal'
-import type { ScriptSegment } from '@/lib/types'
+import SourceFilter from '@/components/SourceFilter'
+import type { ScriptSegment, VideoResult } from '@/lib/types'
+import { videoToSource } from '@/lib/types'
 import { trackEvent } from '@/lib/analytics'
 import { useCredits } from '@/hooks/useCredits'
 
 // Returns sorted unique chapter numbers from segments
 function getChapters(segments: ScriptSegment[]): number[] {
   return [...new Set(segments.map((s) => s.chapter ?? 1))].sort((a, b) => a - b)
+}
+
+/** Returns videos filtered to only those whose source is currently enabled. */
+function filterVideosBySources(videos: VideoResult[], enabledSources: string[]): VideoResult[] {
+  return videos.filter((v) => {
+    const source = videoToSource(v)
+    // Sources outside the user-toggleable set (e.g. Freepik) always show through.
+    if (source === null) return true
+    return enabledSources.includes(source)
+  })
+}
+
+/** Count how many videos would be hidden by the current source filter. */
+function countHiddenBySources(videos: VideoResult[], enabledSources: string[]): number {
+  return videos.length - filterVideosBySources(videos, enabledSources).length
 }
 
 export default function ResultsPage() {
@@ -46,6 +63,7 @@ export default function ResultsPage() {
     isExampleScript,
     isKeywordMode,
     keywordChipCount,
+    enabledSources,
   } = useAppStore()
 
   const [loadingSegmentIds, setLoadingSegmentIds] = useState<Set<string>>(new Set())
@@ -77,7 +95,12 @@ export default function ResultsPage() {
   const progressRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const allChapters = getChapters(segments)
-  const totalClips = searchResults.reduce((sum, r) => sum + r.videos.length, 0)
+  // Count only clips that match the active source filter — the header reflects
+  // what the user can actually see, not what's hiding behind the filter.
+  const totalClips = searchResults.reduce(
+    (sum, r) => sum + filterVideosBySources(r.videos, enabledSources).length,
+    0
+  )
 
   // Scroll the video panel to a newly added manual segment card once it mounts.
   // We scroll videoPanelRef directly because its overflow-hidden parent blocks scrollIntoView.
@@ -200,6 +223,7 @@ export default function ResultsPage() {
           body: JSON.stringify({
             segments: chapterSegments,
             orientation: videoOrientation,
+            enabledSources,
             deductCreditsPerSegment: isKeywordMode,
             // In keyword mode, charge only for the chips the user originally typed —
             // not the post-auto-split segment count. Fall back to segment count if
@@ -261,7 +285,7 @@ export default function ResultsPage() {
         setChapterStatus(chapterNum, 'idle') // allow retry
       }
     },
-    [segments, setChapterStatus, addSearchResults, script, scriptChunkOffsets, isExampleScript, isKeywordMode, keywordChipCount, refreshCredits]
+    [segments, setChapterStatus, addSearchResults, script, scriptChunkOffsets, isExampleScript, isKeywordMode, keywordChipCount, refreshCredits, enabledSources, setShowUpgradeModal, updateSegment, videoOrientation]
   )
 
   const handleLoadNextChapter = (chapterNum: number) => {
@@ -378,7 +402,7 @@ export default function ResultsPage() {
           const searchRes = await fetch('/api/search', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ segments: newSegments, orientation: videoOrientation }),
+            body: JSON.stringify({ segments: newSegments, orientation: videoOrientation, enabledSources }),
           })
           if (searchRes.ok) {
             const { results } = await searchRes.json()
@@ -463,6 +487,7 @@ export default function ResultsPage() {
         body: JSON.stringify({
           segments: newSegments,
           orientation: videoOrientation,
+          enabledSources,
           deductCreditsPerSegment: true,
           // User typed one keyword — they pay 1 credit even if we auto-split it.
           creditsToCharge: 1,
@@ -494,7 +519,7 @@ export default function ResultsPage() {
       })
       setIsSearchingKeyword(false)
     }
-  }, [keywordSearchInput, isSearchingKeyword, segments.length, videoOrientation, addSegments, addSearchResults, refreshCredits, availableCredits, setShowUpgradeModal, updateSegment])
+  }, [keywordSearchInput, isSearchingKeyword, segments.length, videoOrientation, addSegments, addSearchResults, refreshCredits, availableCredits, setShowUpgradeModal, updateSegment, enabledSources])
 
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
 
@@ -567,6 +592,7 @@ export default function ResultsPage() {
           body: JSON.stringify({
             segments: [{ ...placeholder, topic, searchQueries }],
             orientation: videoOrientation,
+            enabledSources,
           }),
         })
         if (searchRes.ok) {
@@ -847,9 +873,15 @@ export default function ResultsPage() {
             </div>
           </div>
 
+          {/* Source filter band — sits directly under the sticky title bar */}
+          <div className="sticky top-[52px] z-10 bg-white/50 backdrop-blur-sm border-b border-purple-200 px-6 py-2 shrink-0 flex items-center gap-3 overflow-x-auto">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-purple-500 shrink-0">Sources</span>
+            <SourceFilter variant="compact" analyticsContext="Results" />
+          </div>
+
           {/* Keyword search bar — only shown in keyword mode */}
           {isKeywordMode && (
-            <div className="sticky top-[52px] z-10 bg-white/60 backdrop-blur-sm border-b border-purple-200 px-6 py-2.5 shrink-0 space-y-1.5">
+            <div className="sticky top-[92px] z-10 bg-white/60 backdrop-blur-sm border-b border-purple-200 px-6 py-2.5 shrink-0 space-y-1.5">
               <form
                 onSubmit={(e) => { e.preventDefault(); handleAddKeyword() }}
                 className="flex items-center gap-2"
@@ -936,7 +968,7 @@ export default function ResultsPage() {
                           </span>
                           {status === 'done' && (
                             <span className="text-[9px] bg-purple-100 text-purple-600 border border-purple-200 px-1.5 py-0.5 rounded-full">
-                              {chapterSegments.length} segments · {searchResults.filter(r => chapterSegments.some(s => s.id === r.segmentId)).reduce((sum, r) => sum + r.videos.length, 0)} clips
+                              {chapterSegments.length} segments · {searchResults.filter(r => chapterSegments.some(s => s.id === r.segmentId)).reduce((sum, r) => sum + filterVideosBySources(r.videos, enabledSources).length, 0)} clips
                             </span>
                           )}
                         </div>
@@ -954,7 +986,7 @@ export default function ResultsPage() {
 
                           if (isManualLoading) {
                             return (
-                              <div key={segment.id} id={`segment-card-${segment.id}`} style={{ scrollMarginTop: '80px' }} className="rounded-2xl border border-purple-200 bg-white/50 backdrop-blur-sm p-8 flex flex-col items-center justify-center gap-3 text-center">
+                              <div key={segment.id} id={`segment-card-${segment.id}`} style={{ scrollMarginTop: '140px' }} className="rounded-2xl border border-purple-200 bg-white/50 backdrop-blur-sm p-8 flex flex-col items-center justify-center gap-3 text-center">
                                 <svg className="animate-spin w-6 h-6 text-purple-500" fill="none" viewBox="0 0 24 24">
                                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
@@ -967,7 +999,7 @@ export default function ResultsPage() {
 
                           if (status === 'loading' && !result) {
                             return (
-                              <div key={segment.id} id={`segment-card-${segment.id}`} style={{ scrollMarginTop: '80px' }} className="rounded-2xl border border-purple-200 bg-white/30 p-5 space-y-3 animate-pulse">
+                              <div key={segment.id} id={`segment-card-${segment.id}`} style={{ scrollMarginTop: '140px' }} className="rounded-2xl border border-purple-200 bg-white/30 p-5 space-y-3 animate-pulse">
                                 <div className="flex items-center gap-3">
                                   <div className="w-7 h-7 rounded-lg bg-purple-200" />
                                   <div className="h-4 bg-purple-200 rounded w-40" />
@@ -986,7 +1018,8 @@ export default function ResultsPage() {
                               key={segment.id}
                               segment={segment}
                               segmentNumber={segIndex + 1}
-                              videos={result?.videos ?? []}
+                              videos={filterVideosBySources(result?.videos ?? [], enabledSources)}
+                              hiddenBySourceFilter={countHiddenBySources(result?.videos ?? [], enabledSources)}
                               onIntersect={handleSegmentIntersect}
                               onInsufficientCredits={() => setShowUpgradeModal(true)}
                             />

@@ -2,7 +2,8 @@
 
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
-import type { AppState, ChapterStatus, ScriptSegment, SearchResults, VideoOrientation } from '@/lib/types'
+import type { AppState, ChapterStatus, ScriptSegment, SearchResults, VideoOrientation, VideoSource } from '@/lib/types'
+import { ALL_VIDEO_SOURCES } from '@/lib/types'
 
 interface AppStateWithHydration extends AppState {
   _hasHydrated: boolean
@@ -32,12 +33,25 @@ const useAppStore = create<AppStateWithHydration>()(
       isExampleScript: false,
       isKeywordMode: false,
       keywordChipCount: 0,
+      enabledSources: [...ALL_VIDEO_SOURCES],
 
       setHasHydrated: (value: boolean) => set({ _hasHydrated: value }),
       setShowUpgradeModal: (value: boolean) => set({ showUpgradeModal: value }),
       setIsExampleScript: (value: boolean) => set({ isExampleScript: value }),
       setIsKeywordMode: (value: boolean) => set({ isKeywordMode: value }),
       setKeywordChipCount: (count: number) => set({ keywordChipCount: count }),
+      setEnabledSources: (sources: VideoSource[]) =>
+        // Never let the user end up with zero sources — fall back to all.
+        set({ enabledSources: sources.length > 0 ? sources : [...ALL_VIDEO_SOURCES] }),
+      toggleSource: (source: VideoSource) =>
+        set((state) => {
+          const has = state.enabledSources.includes(source)
+          const next = has
+            ? state.enabledSources.filter((s) => s !== source)
+            : [...state.enabledSources, source]
+          // Block the user from unchecking the last enabled source.
+          return { enabledSources: next.length > 0 ? next : state.enabledSources }
+        }),
       setVideoOrientation: (orientation: VideoOrientation) => set({ videoOrientation: orientation }),
       setScriptChunks: (offsets: number[], count: number) =>
         set({ scriptChunkOffsets: offsets, scriptChunkCount: count }),
@@ -117,6 +131,7 @@ const useAppStore = create<AppStateWithHydration>()(
         isExampleScript: state.isExampleScript,
         isKeywordMode: state.isKeywordMode,
         keywordChipCount: state.keywordChipCount,
+        enabledSources: state.enabledSources,
       }),
       onRehydrateStorage: () => (state) => {
         state?.setHasHydrated(true)

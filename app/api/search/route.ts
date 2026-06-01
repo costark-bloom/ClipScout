@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/app/api/auth/[...nextauth]/route'
-import { searchYouTube } from '@/lib/youtube'
+import { searchYouTube, type YouTubeLicenseMode } from '@/lib/youtube'
 import { searchPexels } from '@/lib/pexels'
 import { searchPixabay } from '@/lib/pixabay'
 import { searchFreepik } from '@/lib/freepik'
@@ -10,7 +10,21 @@ import { enrichWithMetadata } from '@/lib/metadata-matcher'
 import { generateFallbackQueries, prepareKeywordForSearch } from '@/lib/claude'
 import { getCreditsRemaining, deductCredit } from '@/lib/credits'
 import { supabase } from '@/lib/supabase'
-import type { ScriptSegment, SearchResults, VideoResult, VideoOrientation } from '@/lib/types'
+import type { ScriptSegment, SearchResults, VideoResult, VideoOrientation, VideoSource } from '@/lib/types'
+import { ALL_VIDEO_SOURCES } from '@/lib/types'
+
+/**
+ * Decides the YouTube license fetch mode given the user's selected sources.
+ * Returns null if YouTube should be skipped entirely.
+ */
+function youtubeModeFor(sources: VideoSource[]): YouTubeLicenseMode | null {
+  const wantsCc = sources.includes('youtube_cc')
+  const wantsStandard = sources.includes('youtube_protected')
+  if (wantsCc && wantsStandard) return 'all'
+  if (wantsCc) return 'cc'
+  if (wantsStandard) return 'standard'
+  return null
+}
 
 const MAX_PER_SOURCE = 3
 const MAX_PER_SOURCE_LITERAL = 8  // brand/person/place searches deserve more candidates
@@ -47,17 +61,31 @@ function filterByEntityReference(videos: VideoResult[], entityName: string): Vid
 async function searchForSegment(
   segment: ScriptSegment,
   freepikApiKey?: string,
-  orientation: VideoOrientation = 'both'
+  orientation: VideoOrientation = 'both',
+  enabledSources: VideoSource[] = ALL_VIDEO_SOURCES
 ): Promise<SearchResults> {
   const queries = segment.searchQueries.slice(0, 3)
 
-  // Run all queries across all platforms concurrently.
+  // Resolve which APIs to actually hit. Disabled sources cost zero API
+  // quota and return an empty array placeholder so downstream indexing stays stable.
+  const pexelsOn = enabledSources.includes('pexels')
+  const pixabayOn = enabledSources.includes('pixabay')
+  const ytMode = youtubeModeFor(enabledSources)
+  // YouTube "standard" mode has no API-level filter — over-fetch and drop CC.
+  const ytFetchCount = ytMode === 'standard' ? 10 : 5
+
   // For vertical mode, request more Pixabay results to compensate for its sparse portrait library.
   const pixabayPerPage = orientation === 'vertical' ? 12 : 5
   const allPromises = queries.flatMap((query) => [
-    searchPexels(query, 5, orientation).catch(() => [] as VideoResult[]),
-    searchPixabay(query, pixabayPerPage, orientation).catch(() => [] as VideoResult[]),
-    searchYouTube(query, 5).catch(() => [] as VideoResult[]),
+    pexelsOn
+      ? searchPexels(query, 5, orientation).catch(() => [] as VideoResult[])
+      : Promise.resolve([] as VideoResult[]),
+    pixabayOn
+      ? searchPixabay(query, pixabayPerPage, orientation).catch(() => [] as VideoResult[])
+      : Promise.resolve([] as VideoResult[]),
+    ytMode
+      ? searchYouTube(query, ytFetchCount, ytMode).catch(() => [] as VideoResult[])
+      : Promise.resolve([] as VideoResult[]),
     freepikApiKey
       ? searchFreepik(query, freepikApiKey, 5).catch(() => [] as VideoResult[])
       : Promise.resolve([] as VideoResult[]),
@@ -155,8 +183,12 @@ async function searchForSegment(
 
     if (fallbackQueries.length > 0) {
       const fallbackPromises = fallbackQueries.flatMap((query) => [
-        searchPexels(query, 5, orientation).catch(() => [] as VideoResult[]),
-        searchPixabay(query, pixabayPerPage, orientation).catch(() => [] as VideoResult[]),
+        pexelsOn
+          ? searchPexels(query, 5, orientation).catch(() => [] as VideoResult[])
+          : Promise.resolve([] as VideoResult[]),
+        pixabayOn
+          ? searchPixabay(query, pixabayPerPage, orientation).catch(() => [] as VideoResult[])
+          : Promise.resolve([] as VideoResult[]),
         freepikApiKey
           ? searchFreepik(query, freepikApiKey, 5).catch(() => [] as VideoResult[])
           : Promise.resolve([] as VideoResult[]),
@@ -236,12 +268,20 @@ export async function POST(request: NextRequest) {
       orientation = 'both',
       deductCreditsPerSegment = false,
       creditsToCharge,
+      enabledSources: rawSources,
     } = body as {
       segments: unknown
       orientation?: VideoOrientation
       deductCreditsPerSegment?: boolean
       creditsToCharge?: number
+      enabledSources?: VideoSource[]
     }
+
+    // Validate enabledSources: fall back to "all" if missing, empty, or junk.
+    const enabledSources: VideoSource[] = Array.isArray(rawSources) && rawSources.length > 0
+      ? rawSources.filter((s): s is VideoSource => ALL_VIDEO_SOURCES.includes(s as VideoSource))
+      : [...ALL_VIDEO_SOURCES]
+    const finalSources = enabledSources.length > 0 ? enabledSources : [...ALL_VIDEO_SOURCES]
 
     if (!Array.isArray(segments)) {
       return NextResponse.json({ error: 'segments array is required' }, { status: 400 })
@@ -318,7 +358,7 @@ export async function POST(request: NextRequest) {
     const results = await withConcurrencyLimit(
       searchSegments,
       3,
-      (segment) => searchForSegment(segment, freepikApiKey, orientation)
+      (segment) => searchForSegment(segment, freepikApiKey, orientation, finalSources)
     )
 
     // Deduct credits after a successful search

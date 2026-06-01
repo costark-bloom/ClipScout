@@ -17,6 +17,25 @@ export interface ScriptSegment {
 
 export type VideoLicense = 'royalty-free' | 'creative-commons' | 'standard' | 'unknown'
 
+/**
+ * User-toggleable footage sources. YouTube is split into two flavours by license
+ * so users can opt out of copyright-risky results without losing CC YouTube clips.
+ */
+export type VideoSource = 'pexels' | 'pixabay' | 'youtube_cc' | 'youtube_protected'
+
+export const ALL_VIDEO_SOURCES: VideoSource[] = ['pexels', 'pixabay', 'youtube_cc', 'youtube_protected']
+
+/** Maps a VideoResult onto the user-facing source bucket used by the source filter. */
+export function videoToSource(video: { platform: VideoResult['platform']; license?: VideoLicense }): VideoSource | null {
+  if (video.platform === 'pexels') return 'pexels'
+  if (video.platform === 'pixabay') return 'pixabay'
+  if (video.platform === 'youtube') {
+    return video.license === 'creative-commons' ? 'youtube_cc' : 'youtube_protected'
+  }
+  // Freepik isn't yet user-toggleable; treat as always-on so we don't hide it.
+  return null
+}
+
 export interface VideoResult {
   id: string
   title: string
@@ -57,9 +76,13 @@ export interface AppState {
   isKeywordMode: boolean
   /** Number of keyword chips the user originally typed (before auto-splitting), used for credit charging */
   keywordChipCount: number
+  /** Which footage sources are currently enabled. Persisted across sessions. */
+  enabledSources: VideoSource[]
   setVideoOrientation: (orientation: VideoOrientation) => void
   setIsKeywordMode: (value: boolean) => void
   setKeywordChipCount: (count: number) => void
+  setEnabledSources: (sources: VideoSource[]) => void
+  toggleSource: (source: VideoSource) => void
   setScript: (script: string) => void
   setSegments: (segments: ScriptSegment[]) => void
   addSegments: (segments: ScriptSegment[]) => void
