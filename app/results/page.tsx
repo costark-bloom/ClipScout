@@ -11,8 +11,8 @@ import AuthGate, { useAuthGate } from '@/components/AuthGate'
 import UserMenu from '@/components/UserMenu'
 import UpgradeModal from '@/components/UpgradeModal'
 import SourceFilter from '@/components/SourceFilter'
-import type { ScriptSegment, VideoResult } from '@/lib/types'
-import { videoToSource } from '@/lib/types'
+import type { ScriptSegment, VideoResult, VideoSource } from '@/lib/types'
+import { ALL_VIDEO_SOURCES, videoToSource } from '@/lib/types'
 import { trackEvent } from '@/lib/analytics'
 import { useCredits } from '@/hooks/useCredits'
 
@@ -34,6 +34,21 @@ function filterVideosBySources(videos: VideoResult[], enabledSources: string[]):
 /** Count how many videos would be hidden by the current source filter. */
 function countHiddenBySources(videos: VideoResult[], enabledSources: string[]): number {
   return videos.length - filterVideosBySources(videos, enabledSources).length
+}
+
+const SOURCE_LABELS: Record<VideoSource, string> = {
+  pexels: 'Pexels',
+  pixabay: 'Pixabay',
+  youtube_cc: 'YouTube CC',
+  youtube_protected: 'YouTube Protected',
+}
+
+/** Returns a human-readable list like "Pexels, Pixabay & YouTube CC" */
+function formatSourceList(sources: VideoSource[]): string {
+  const labels = sources.map((s) => SOURCE_LABELS[s])
+  if (labels.length <= 1) return labels.join('')
+  if (labels.length === 2) return labels.join(' & ')
+  return `${labels.slice(0, -1).join(', ')} & ${labels[labels.length - 1]}`
 }
 
 export default function ResultsPage() {
@@ -101,6 +116,17 @@ export default function ResultsPage() {
     (sum, r) => sum + filterVideosBySources(r.videos, enabledSources).length,
     0
   )
+  // How many clips are currently hidden because the user toggled off sources
+  // AFTER results loaded. Zero when the filter was applied before searching
+  // (in that case those sources were never fetched).
+  const totalHiddenByFilter = searchResults.reduce(
+    (sum, r) => sum + countHiddenBySources(r.videos, enabledSources),
+    0
+  )
+  const isSourceFilterActive = enabledSources.length < ALL_VIDEO_SOURCES.length
+  const segmentsWithHidden = searchResults.filter(
+    (r) => countHiddenBySources(r.videos, enabledSources) > 0
+  ).length
 
   // Scroll the video panel to a newly added manual segment card once it mounts.
   // We scroll videoPanelRef directly because its overflow-hidden parent blocks scrollIntoView.
@@ -829,6 +855,9 @@ export default function ResultsPage() {
               </div>
             </div>
             <div className="flex items-center gap-3">
+              <div className="hidden md:block">
+                <SourceFilter variant="compact" analyticsContext="Results" />
+              </div>
               {isAuthenticated && !isKeywordMode && (
                 <button
                   onClick={handleSaveScript}
@@ -873,15 +902,9 @@ export default function ResultsPage() {
             </div>
           </div>
 
-          {/* Source filter band — sits directly under the sticky title bar */}
-          <div className="sticky top-[52px] z-10 bg-white/50 backdrop-blur-sm border-b border-purple-200 px-6 py-2 shrink-0 flex items-center gap-3 overflow-x-auto">
-            <span className="text-[10px] font-bold uppercase tracking-widest text-purple-500 shrink-0">Sources</span>
-            <SourceFilter variant="compact" analyticsContext="Results" />
-          </div>
-
           {/* Keyword search bar — only shown in keyword mode */}
           {isKeywordMode && (
-            <div className="sticky top-[92px] z-10 bg-white/60 backdrop-blur-sm border-b border-purple-200 px-6 py-2.5 shrink-0 space-y-1.5">
+            <div className="sticky top-[52px] z-10 bg-white/60 backdrop-blur-sm border-b border-purple-200 px-6 py-2.5 shrink-0 space-y-1.5">
               <form
                 onSubmit={(e) => { e.preventDefault(); handleAddKeyword() }}
                 className="flex items-center gap-2"
@@ -948,7 +971,48 @@ export default function ResultsPage() {
 
           {/* Chapter-by-chapter results */}
           {!isLoading && segments.length > 0 && (
-            <div ref={videoPanelRef} className="flex-1 overflow-y-auto px-6 py-6 space-y-10">
+            <div ref={videoPanelRef} className="flex-1 overflow-y-auto px-6 py-6 space-y-6">
+              {/* Source-filter banner — always visible while the filter is active.
+                  Message varies based on whether videos were actually hidden
+                  (filter applied after search) vs sources never fetched
+                  (filter applied before search). */}
+              {isSourceFilterActive && (
+                <div className="rounded-xl border border-amber-200 bg-amber-50/80 px-4 py-3 flex items-start gap-3">
+                  <svg className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 4.5h13.5m-13.5 6h13.5m-13.5 6h9M18 9l3 3-3 3" />
+                  </svg>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold text-amber-900">
+                      {totalHiddenByFilter > 0
+                        ? `${totalHiddenByFilter} clip${totalHiddenByFilter !== 1 ? 's' : ''} hidden across ${segmentsWithHidden} segment${segmentsWithHidden !== 1 ? 's' : ''}`
+                        : `Source filter active — showing ${formatSourceList(enabledSources)} only`}
+                    </p>
+                    <p className="text-[11px] text-amber-700 mt-0.5">
+                      {totalHiddenByFilter > 0
+                        ? `Re-enable the disabled sources to reveal them.`
+                        : `Future searches and "Load more" will skip ${formatSourceList(ALL_VIDEO_SOURCES.filter((s) => !enabledSources.includes(s)))}.`}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      useAppStore.getState().setEnabledSources([...ALL_VIDEO_SOURCES])
+                      trackEvent('Source Filter Changed', {
+                        context: 'Results — Banner',
+                        source: 'all',
+                        enabled: true,
+                        enabled_sources_after: ALL_VIDEO_SOURCES.join(','),
+                        enabled_sources_count: ALL_VIDEO_SOURCES.length,
+                      })
+                    }}
+                    className="text-[11px] font-semibold text-amber-800 hover:text-amber-950 underline underline-offset-2 shrink-0"
+                  >
+                    Show all sources
+                  </button>
+                </div>
+              )}
+
+              <div className="space-y-10">
               {allChapters.map((chapterNum, chapterIdx) => {
                 const chapterSegments = segments.filter((s) => (s.chapter ?? 1) === chapterNum)
                 const isVisible = visibleChapters.includes(chapterNum)
@@ -986,7 +1050,7 @@ export default function ResultsPage() {
 
                           if (isManualLoading) {
                             return (
-                              <div key={segment.id} id={`segment-card-${segment.id}`} style={{ scrollMarginTop: '140px' }} className="rounded-2xl border border-purple-200 bg-white/50 backdrop-blur-sm p-8 flex flex-col items-center justify-center gap-3 text-center">
+                              <div key={segment.id} id={`segment-card-${segment.id}`} style={{ scrollMarginTop: '100px' }} className="rounded-2xl border border-purple-200 bg-white/50 backdrop-blur-sm p-8 flex flex-col items-center justify-center gap-3 text-center">
                                 <svg className="animate-spin w-6 h-6 text-purple-500" fill="none" viewBox="0 0 24 24">
                                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
@@ -999,7 +1063,7 @@ export default function ResultsPage() {
 
                           if (status === 'loading' && !result) {
                             return (
-                              <div key={segment.id} id={`segment-card-${segment.id}`} style={{ scrollMarginTop: '140px' }} className="rounded-2xl border border-purple-200 bg-white/30 p-5 space-y-3 animate-pulse">
+                              <div key={segment.id} id={`segment-card-${segment.id}`} style={{ scrollMarginTop: '100px' }} className="rounded-2xl border border-purple-200 bg-white/30 p-5 space-y-3 animate-pulse">
                                 <div className="flex items-center gap-3">
                                   <div className="w-7 h-7 rounded-lg bg-purple-200" />
                                   <div className="h-4 bg-purple-200 rounded w-40" />
@@ -1063,6 +1127,7 @@ export default function ResultsPage() {
                   </div>
                 )
               })}
+              </div>
 
               <div className="h-16" />
             </div>
