@@ -1,10 +1,28 @@
 'use client'
 
-import Link from 'next/link'
+import { useSession } from 'next-auth/react'
 import HomeHeader from '@/components/HomeHeader'
 import PlanGrid from '@/components/PlanGrid'
 
+// TODO(upgrades): When a signed-in user with an active subscription clicks
+// "Get Started" on a different tier, we currently spin up a *new* Stripe
+// subscription via /api/stripe/checkout instead of updating their existing
+// one. That risks double-charging (parallel Creator + Pro subs).
+// Fix options:
+//   (a) Wire up Stripe Billing Portal for plan changes — Stripe handles
+//       proration + UX. Quickest path.
+//   (b) Add /api/stripe/change-plan that calls
+//       stripe.subscriptions.update(subId, { items: [...] }) with proration.
+// Safe for pre-launch since most early users will stay on Creator after
+// trial, but resolve before promoting tier upgrades.
 export default function PricingPage() {
+  // Pricing page is session-aware: signed-out visitors only see Creator (it's
+  // the only plan they can actually trial via the new-user funnel), signed-in
+  // users see all three so they can upgrade. Heading + trial copy adjust to
+  // match what's below.
+  const { data: session, status } = useSession()
+  const isSignedIn = status === 'authenticated' && !!session
+
   return (
     <div className="min-h-screen flex flex-col" style={{ position: 'relative', zIndex: 1 }}>
       <HomeHeader />
@@ -16,17 +34,42 @@ export default function PricingPage() {
             Plans &amp; Pricing
           </span>
           <h1 className="text-4xl sm:text-5xl font-extrabold text-purple-950 mb-4 tracking-tight leading-tight">
-            The right plan for<br />
-            <span className="bg-gradient-to-r from-purple-600 to-indigo-500 bg-clip-text text-transparent">
-              every creator
-            </span>
+            {isSignedIn ? (
+              <>The right plan for<br />
+                <span className="bg-gradient-to-r from-purple-600 to-indigo-500 bg-clip-text text-transparent">
+                  every creator
+                </span>
+              </>
+            ) : (
+              <>Start finding B-roll in<br />
+                <span className="bg-gradient-to-r from-purple-600 to-indigo-500 bg-clip-text text-transparent">
+                  30 seconds, not 3 hours
+                </span>
+              </>
+            )}
           </h1>
           <p className="text-purple-600 text-base max-w-md mx-auto">
-            Pay only for the footage searches you run. No subscriptions that waste money when you&apos;re between projects.
+            {isSignedIn
+              ? 'Monthly credits for AI-powered B-roll discovery. Unused credits roll over so you never lose what you\u2019ve paid for.'
+              : 'Try every ClipScout feature free for 3 days. Cancel anytime before your trial ends — no charge.'}
           </p>
 
+          {/* Trial badge — only shown to signed-out users since they're the
+              ones who actually get the trial. Existing users don't need to
+              be reminded they're already past it. */}
+          {!isSignedIn && (
+            <div className="mt-5 inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-gradient-to-r from-indigo-100 to-purple-100 border border-purple-200">
+              <svg className="w-3.5 h-3.5 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09Z" />
+              </svg>
+              <span className="text-xs font-semibold text-purple-800">
+                3-day free trial · Cancel anytime
+              </span>
+            </div>
+          )}
+
           {/* How credits work — anchors to explainer below */}
-          <div className="mt-3">
+          <div className="mt-4">
             <a
               href="#credits"
               className="inline-flex items-center gap-1.5 text-sm text-purple-500 hover:text-purple-700 transition-colors"
@@ -39,17 +82,17 @@ export default function PricingPage() {
           </div>
         </div>
 
-        {/* Plan grid (toggle + cards + checkout flow) */}
+        {/* Plan grid (toggle + cards + checkout flow). PlanGrid handles the
+            anon/signed-in plan filtering internally. */}
         <PlanGrid variant="full" analyticsContext="Pricing" />
 
-        {/* Free trial note */}
-        <p className="text-center text-sm text-purple-500 mt-8">
-          Not ready to commit?{' '}
-          <Link href="/" className="text-purple-700 font-medium hover:text-purple-950 underline underline-offset-2 transition-colors">
-            Try ClipScout free
-          </Link>{' '}
-          — no credit card required.
-        </p>
+        {/* Trial reassurance line — only meaningful for users who haven't
+            already used their trial. */}
+        {!isSignedIn && (
+          <p className="text-center text-sm text-purple-500 mt-8">
+            Card required to start your trial · Cancel anytime in Settings before it converts
+          </p>
+        )}
 
         {/* Credits explainer */}
         <div id="credits" className="mt-14 max-w-2xl mx-auto bg-white/70 border border-purple-200 rounded-2xl p-7 backdrop-blur-sm scroll-mt-24">

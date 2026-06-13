@@ -11,7 +11,7 @@ export async function GET() {
 
   const { data } = await supabase
     .from('user_settings')
-    .select('freepik_api_key, subscription_plan, subscription_interval, subscription_status, subscription_period_end, credits_remaining, credits_used')
+    .select('freepik_api_key, subscription_plan, subscription_interval, subscription_status, subscription_period_end, trial_started_at, trial_ends_at, credits_remaining, credits_used')
     .eq('user_email', session.user.email)
     .single()
 
@@ -24,6 +24,8 @@ export async function GET() {
     subscription_interval: data?.subscription_interval ?? null,
     subscription_status: data?.subscription_status ?? null,
     subscription_period_end: data?.subscription_period_end ?? null,
+    trial_started_at: data?.trial_started_at ?? null,
+    trial_ends_at: data?.trial_ends_at ?? null,
     credits_remaining: data?.credits_remaining ?? 3,
     credits_used: data?.credits_used ?? 0,
   })

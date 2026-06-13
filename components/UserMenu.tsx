@@ -36,10 +36,13 @@ export default function UserMenu() {
     fetch('/api/user/settings')
       .then((r) => r.json())
       .then((d) => {
-        if (d.subscription_plan && d.subscription_status === 'active') {
+        // Treat 'trialing' and 'cancelling' the same as 'active' — the user
+        // still has full plan access, so the badge should reflect that.
+        const activeStatuses = new Set(['active', 'trialing', 'cancelling'])
+        if (d.subscription_plan && activeStatuses.has(d.subscription_status)) {
           setPlanLabel(PLAN_LABELS[d.subscription_plan] ?? null)
         } else {
-          setPlanLabel(null) // free trial
+          setPlanLabel(null)
         }
       })
       .catch(() => {})

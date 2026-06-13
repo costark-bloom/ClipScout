@@ -15,6 +15,7 @@ const PAGE_NAMES: Record<string, string> = {
   '/scripts':          'Saved Scripts',
   '/contact':          'Contact',
   '/reset-password':   'Reset Password',
+  '/onboarding':       'Onboarding',
 }
 
 function getPageName(path: string): string {

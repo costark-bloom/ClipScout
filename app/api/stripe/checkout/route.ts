@@ -3,6 +3,12 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/app/api/auth/[...nextauth]/route'
 import { stripe, PRICE_IDS, PACK_PRICE_IDS, type PlanId, type BillingInterval } from '@/lib/stripe'
 
+/**
+ * Length of the new-user free trial, in days. Kept in sync with the value
+ * surfaced on the onboarding TrialOffer screen — change one, change the other.
+ */
+const TRIAL_DAYS = 3
+
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
@@ -10,11 +16,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'You must be signed in to subscribe.' }, { status: 401 })
     }
 
-    const { planId, interval, packId, firstMonthPromo } = (await req.json()) as {
+    const { planId, interval, packId, trial, from } = (await req.json()) as {
       planId: PlanId
       interval: BillingInterval
       packId?: string | null
-      firstMonthPromo?: boolean
+      /** When true, attach a free trial (no charge for TRIAL_DAYS, card required). */
+      trial?: boolean
+      /** Free-form attribution, e.g. 'onboarding' or 'pricing'. Saved to metadata. */
+      from?: string
     }
 
     const priceId = PRICE_IDS[planId]?.[interval]
@@ -22,25 +31,26 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid plan or billing interval.' }, { status: 400 })
     }
 
+    // TODO(upgrades): This route unconditionally creates a *new* subscription,
+    // which is wrong for users who already have an active sub and are trying
+    // to upgrade to a different tier from /pricing. Should detect existing
+    // sub and either route through Stripe Billing Portal or call
+    // stripe.subscriptions.update with proration. See app/pricing/page.tsx
+    // for the matching TODO. — punted on 2026-06-13.
+
     const baseUrl = process.env.NEXTAUTH_URL ?? 'http://localhost:3000'
 
-    // Build line items — subscription + optional one-time credit pack
+    // Build line items — subscription + optional one-time credit pack.
+    // Note: credit packs are NOT allowed alongside a trial, since the pack is a
+    // one-time charge that would defeat the "$0 today" promise.
     const lineItems: { price: string; quantity: number }[] = [
       { price: priceId, quantity: 1 },
     ]
-    if (packId && PACK_PRICE_IDS[packId]) {
+    if (!trial && packId && PACK_PRICE_IDS[packId]) {
       lineItems.push({ price: PACK_PRICE_IDS[packId], quantity: 1 })
     }
 
-    // First-month promo: server-side gate. Ignore the client flag unless plan +
-    // interval match the promo combination (Creator + monthly). This is the real
-    // restriction — Stripe's product-level limit is just a backup layer.
-    const isPromoEligible = firstMonthPromo === true && planId === 'creator' && interval === 'monthly'
-    const promoCouponId = process.env.STRIPE_FIRST_MONTH_COUPON_ID
-    const applyPromo = isPromoEligible && !!promoCouponId
-    if (isPromoEligible && !promoCouponId) {
-      console.warn('[stripe/checkout] firstMonthPromo requested but STRIPE_FIRST_MONTH_COUPON_ID is not set')
-    }
+    const isTrial = trial === true
 
     const checkoutSession = await stripe.checkout.sessions.create({
       mode: 'subscription',
@@ -50,24 +60,28 @@ export async function POST(req: NextRequest) {
         userEmail: session.user.email,
         planId,
         interval,
-        firstMonthPromo: applyPromo ? 'true' : 'false',
+        trial: isTrial ? 'true' : 'false',
+        from: from ?? '',
       },
       subscription_data: {
+        ...(isTrial ? { trial_period_days: TRIAL_DAYS } : {}),
         metadata: {
           userEmail: session.user.email,
           planId,
           interval,
-          firstMonthPromo: applyPromo ? 'true' : 'false',
+          trial: isTrial ? 'true' : 'false',
+          from: from ?? '',
         },
       },
+      // Require card upfront even during the trial — that's the whole point of
+      // this funnel. (This is the default for `mode: 'subscription'` but we set
+      // it explicitly so a future Stripe default change doesn't silently break.)
+      payment_method_collection: 'always',
       success_url: `${baseUrl}/pricing/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${baseUrl}/pricing`,
-      // Stripe forbids setting both `discounts` and `allow_promotion_codes` —
-      // when we auto-apply the new-user coupon, the manual promo-code field
-      // disappears (which is what we want for that flow anyway).
-      ...(applyPromo
-        ? { discounts: [{ coupon: promoCouponId }] }
-        : { allow_promotion_codes: true }),
+      cancel_url: isTrial
+        ? `${baseUrl}/onboarding?canceled=1`
+        : `${baseUrl}/pricing`,
+      allow_promotion_codes: true,
     })
 
     return NextResponse.json({ url: checkoutSession.url })

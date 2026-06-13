@@ -4,6 +4,7 @@ import './globals.css'
 import SessionProvider from '@/components/SessionProvider'
 import Footer from '@/components/Footer'
 import MixpanelIdentify from '@/components/MixpanelIdentify'
+import OnboardingModal from '@/components/onboarding/OnboardingModal'
 
 export const metadata: Metadata = {
   title: 'ClipScout — AI-Powered Video Discovery',
@@ -31,6 +32,7 @@ export default function RootLayout({
       <body className="min-h-screen flex flex-col">
         <SessionProvider>
           <MixpanelIdentify />
+          <OnboardingModal />
           <div className="flex-1">{children}</div>
           <Footer />
         </SessionProvider>

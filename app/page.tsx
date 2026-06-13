@@ -1,6 +1,5 @@
 import ScriptInput from '@/components/ScriptInput'
 import HomeHeader from '@/components/HomeHeader'
-import FreeTrialBadge from '@/components/FreeTrialBadge'
 
 export default function HomePage() {
   return (
@@ -50,9 +49,6 @@ export default function HomePage() {
 
 
         </div>
-
-        {/* Free trial badge — guests only */}
-        <FreeTrialBadge />
 
         {/* Script Input */}
         <div className="w-full max-w-3xl animate-slide-up">

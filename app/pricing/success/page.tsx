@@ -5,10 +5,29 @@ import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import HomeHeader from '@/components/HomeHeader'
 
+interface VerifyResult {
+  isTrial?: boolean
+  trialEndsAt?: string | null
+}
+
+function formatTrialEnd(iso: string | null | undefined): string | null {
+  if (!iso) return null
+  try {
+    return new Date(iso).toLocaleDateString('en-US', {
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric',
+    })
+  } catch {
+    return null
+  }
+}
+
 function SuccessContent() {
   const searchParams = useSearchParams()
   const sessionId = searchParams.get('session_id')
   const [status, setStatus] = useState<'verifying' | 'done' | 'error'>('verifying')
+  const [result, setResult] = useState<VerifyResult>({})
 
   useEffect(() => {
     if (!sessionId) { setStatus('done'); return }
@@ -24,6 +43,7 @@ function SuccessContent() {
           console.error('[success] verify error:', d.error)
           setStatus('error')
         } else {
+          setResult({ isTrial: d.isTrial, trialEndsAt: d.trialEndsAt })
           setStatus('done')
         }
       })
@@ -39,11 +59,14 @@ function SuccessContent() {
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
           </svg>
         </div>
-        <h1 className="text-2xl font-extrabold text-purple-950 mb-2">Activating your plan…</h1>
-        <p className="text-purple-500 text-sm">Just a moment while we set up your account.</p>
+        <h1 className="text-2xl font-extrabold text-purple-950 mb-2">Setting things up…</h1>
+        <p className="text-purple-500 text-sm">Just a moment while we activate your account.</p>
       </>
     )
   }
+
+  const isTrial = !!result.isTrial
+  const trialEndStr = formatTrialEnd(result.trialEndsAt ?? null)
 
   return (
     <>
@@ -53,10 +76,29 @@ function SuccessContent() {
         </svg>
       </div>
 
-      <h1 className="text-3xl font-extrabold text-purple-950 mb-3">You&apos;re all set!</h1>
-      <p className="text-purple-600 text-base leading-relaxed mb-8">
-        Your subscription is active. Your credits are ready to use — start finding b-roll for your next script.
-      </p>
+      {isTrial ? (
+        <>
+          <h1 className="text-3xl font-extrabold text-purple-950 mb-3">Your free trial has started</h1>
+          <p className="text-purple-600 text-base leading-relaxed mb-2">
+            You&apos;ve got <span className="font-semibold text-purple-950">75 credits</span> ready to use and full access
+            to every ClipScout feature.
+          </p>
+          {trialEndStr && (
+            <p className="text-purple-600 text-sm mb-8">
+              Your trial ends on <span className="font-semibold text-purple-950">{trialEndStr}</span> — we&apos;ll
+              email you the day before it converts.
+            </p>
+          )}
+          {!trialEndStr && <div className="mb-8" />}
+        </>
+      ) : (
+        <>
+          <h1 className="text-3xl font-extrabold text-purple-950 mb-3">You&apos;re all set!</h1>
+          <p className="text-purple-600 text-base leading-relaxed mb-8">
+            Your subscription is active. Your credits are ready to use — start finding b-roll for your next script.
+          </p>
+        </>
+      )}
 
       <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
         <Link

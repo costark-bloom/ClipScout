@@ -23,18 +23,24 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'sessionId required' }, { status: 400 })
     }
 
-    // Retrieve the checkout session from Stripe
     const checkoutSession = await stripe.checkout.sessions.retrieve(sessionId, {
       expand: ['subscription'],
     })
 
-    // Validate it actually belongs to this user
     if (checkoutSession.customer_email !== session.user.email &&
         checkoutSession.metadata?.userEmail !== session.user.email) {
       return NextResponse.json({ error: 'Session does not belong to this user' }, { status: 403 })
     }
 
-    if (checkoutSession.payment_status !== 'paid') {
+    // For trial signups, payment_status is 'no_payment_required' (card collected,
+    // not charged yet). For paid signups it's 'paid'. Anything else means the
+    // checkout didn't complete cleanly and we shouldn't activate anything.
+    const isTrial = checkoutSession.metadata?.trial === 'true'
+    const paymentOk =
+      checkoutSession.payment_status === 'paid' ||
+      (isTrial && checkoutSession.payment_status === 'no_payment_required')
+
+    if (!paymentOk) {
       return NextResponse.json({ alreadyUpdated: false, message: 'Payment not completed' })
     }
 
@@ -46,18 +52,27 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing plan metadata' }, { status: 400 })
     }
 
-    // Check if already updated (webhook may have fired successfully in production)
     const { data: existing } = await supabase
       .from('user_settings')
-      .select('subscription_plan, subscription_status')
+      .select('subscription_plan, subscription_status, trial_ends_at')
       .eq('user_email', userEmail)
       .single()
 
-    if (existing?.subscription_plan === planId && existing?.subscription_status === 'active') {
-      return NextResponse.json({ alreadyUpdated: true, planId, interval })
+    const activeStatuses = ['active', 'trialing']
+    if (
+      existing?.subscription_plan === planId &&
+      activeStatuses.includes(existing?.subscription_status ?? '')
+    ) {
+      return NextResponse.json({
+        alreadyUpdated: true,
+        planId,
+        interval,
+        isTrial,
+        trialEndsAt: existing.trial_ends_at,
+      })
     }
 
-    // Webhook didn't fire (common in local dev) — apply the update now
+    // Webhook hasn't fired yet (common in local dev) — apply the update now.
     const sub = typeof checkoutSession.subscription === 'string'
       ? await stripe.subscriptions.retrieve(checkoutSession.subscription)
       : checkoutSession.subscription
@@ -66,17 +81,24 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Could not retrieve subscription' }, { status: 500 })
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const subAny = sub as any
+    const status = sub.status // 'trialing' or 'active'
+    const trialEndIso = subAny.trial_end ? new Date(subAny.trial_end * 1000).toISOString() : null
+
     await supabase.from('user_settings').upsert(
       {
         user_email: userEmail,
         subscription_plan: planId,
         subscription_interval: interval,
-        subscription_status: 'active',
+        subscription_status: status,
         stripe_customer_id: checkoutSession.customer as string,
         stripe_subscription_id: sub.id,
-        subscription_period_end: (sub as any).current_period_end
-          ? new Date((sub as any).current_period_end * 1000).toISOString()
+        subscription_period_end: subAny.current_period_end
+          ? new Date(subAny.current_period_end * 1000).toISOString()
           : null,
+        trial_started_at: subAny.trial_start ? new Date(subAny.trial_start * 1000).toISOString() : null,
+        trial_ends_at: trialEndIso,
         credits_remaining: PLAN_CREDITS[planId] ?? 0,
         credits_used: 0,
         updated_at: new Date().toISOString(),
@@ -85,9 +107,18 @@ export async function POST(req: NextRequest) {
     )
 
     await grantSubscriptionCredits(userEmail, planId)
-    console.log(`[verify-session] subscription applied for ${userEmail} (${planId}/${interval})`)
+    console.log(
+      `[verify-session] ${status === 'trialing' ? 'trial started' : 'subscription applied'} ` +
+        `for ${userEmail} (${planId}/${interval})`,
+    )
 
-    return NextResponse.json({ alreadyUpdated: false, planId, interval })
+    return NextResponse.json({
+      alreadyUpdated: false,
+      planId,
+      interval,
+      isTrial: status === 'trialing',
+      trialEndsAt: trialEndIso,
+    })
   } catch (err) {
     console.error('[verify-session] error:', err)
     return NextResponse.json({ error: 'Failed to verify session' }, { status: 500 })

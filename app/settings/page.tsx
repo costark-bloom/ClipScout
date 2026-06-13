@@ -31,7 +31,8 @@ export default function SettingsPage() {
     interval: string | null
     status: string | null
     periodEnd: string | null
-  }>({ plan: null, interval: null, status: null, periodEnd: null })
+    trialEndsAt: string | null
+  }>({ plan: null, interval: null, status: null, periodEnd: null, trialEndsAt: null })
 
   const [freeCredits, setFreeCredits] = useState<{ remaining: number; used: number } | null>(null)
   const [cancelling, setCancelling] = useState(false)
@@ -60,6 +61,7 @@ export default function SettingsPage() {
             interval: d.subscription_interval ?? null,
             status: d.subscription_status ?? null,
             periodEnd: d.subscription_period_end ?? null,
+            trialEndsAt: d.trial_ends_at ?? null,
           })
           setFreeCredits({
             remaining: d.credits_remaining ?? 3,
@@ -139,9 +141,17 @@ export default function SettingsPage() {
       const res = await fetch('/api/stripe/cancel', { method: 'POST' })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed to cancel')
+      // Use the pre-cancel status to pick the right message — the moment we
+      // update local state below the trialing branch becomes invisible.
+      const wasTrialing = subscription.status === 'trialing'
       setSubscription((prev) => ({ ...prev, status: 'cancelling' }))
       setShowCancelConfirm(false)
-      setCancelMessage({ type: 'success', text: 'Your subscription will cancel at the end of your billing period. You keep access until then.' })
+      setCancelMessage({
+        type: 'success',
+        text: wasTrialing
+          ? `Your trial is cancelled. You keep full access until ${trialEndDate ?? 'your trial ends'}, and your card won't be charged.`
+          : 'Your subscription will cancel at the end of your billing period. You keep access until then.',
+      })
     } catch (err) {
       setCancelMessage({ type: 'error', text: err instanceof Error ? err.message : 'Something went wrong.' })
     } finally {
@@ -150,9 +160,21 @@ export default function SettingsPage() {
   }
 
   const planInfo = subscription.plan ? PLAN_LABELS[subscription.plan] : null
-  const isActive = subscription.status === 'active' || subscription.status === 'cancelling'
+  const isTrialing = subscription.status === 'trialing'
+  // 'trialing' is included so trial users see their plan + can cancel — the
+  // onboarding TrialOffer screen promises "cancel anytime in Settings".
+  const isActive =
+    subscription.status === 'active' ||
+    subscription.status === 'cancelling' ||
+    isTrialing
   const periodEndDate = subscription.periodEnd
     ? new Date(subscription.periodEnd).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+    : null
+  const trialEndDate = subscription.trialEndsAt
+    ? new Date(subscription.trialEndsAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+    : null
+  const trialDaysLeft = subscription.trialEndsAt
+    ? Math.max(0, Math.ceil((new Date(subscription.trialEndsAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
     : null
 
   const NAV_ITEMS: { id: Tab; label: string; icon: React.ReactNode }[] = [
@@ -200,16 +222,22 @@ export default function SettingsPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
                 </svg>
               </div>
-              <h2 className="text-base font-bold text-purple-950 text-center mb-2">Cancel subscription?</h2>
+              <h2 className="text-base font-bold text-purple-950 text-center mb-2">
+                {isTrialing ? 'Cancel free trial?' : 'Cancel subscription?'}
+              </h2>
               <p className="text-sm text-purple-600 text-center leading-relaxed mb-6">
-                You&apos;ll keep full access until the end of your current billing period. After that, your account will revert to the free plan.
+                {isTrialing ? (
+                  <>You&apos;ll keep full access until <span className="font-semibold text-purple-950">{trialEndDate ?? 'your trial ends'}</span>. Your card won&apos;t be charged.</>
+                ) : (
+                  <>You&apos;ll keep full access until the end of your current billing period. After that, your account will revert to the free plan.</>
+                )}
               </p>
               <div className="flex gap-3">
                 <button
                   onClick={() => setShowCancelConfirm(false)}
                   className="flex-1 text-sm font-medium text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200 px-4 py-2.5 rounded-xl transition-colors"
                 >
-                  Keep plan
+                  {isTrialing ? 'Keep trial' : 'Keep plan'}
                 </button>
                 <button
                   onClick={handleCancelSubscription}
@@ -337,26 +365,35 @@ export default function SettingsPage() {
 
                   {planInfo && isActive ? (
                     <div className="space-y-4">
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-3 flex-wrap">
                         <span className={`text-sm font-bold px-3 py-1 rounded-full border ${planInfo.color}`}>
                           {planInfo.label}
                         </span>
                         <span className="text-xs text-purple-500 capitalize">{subscription.interval} billing</span>
                         {subscription.status === 'cancelling' ? (
                           <span className="text-xs font-medium text-orange-600 bg-orange-50 border border-orange-200 px-2 py-0.5 rounded-full">Cancels at period end</span>
+                        ) : isTrialing ? (
+                          <span className="text-xs font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-full">
+                            Free trial{trialDaysLeft != null ? ` · ${trialDaysLeft} day${trialDaysLeft === 1 ? '' : 's'} left` : ''}
+                          </span>
                         ) : (
                           <span className="text-xs font-medium text-green-700 bg-green-50 border border-green-200 px-2 py-0.5 rounded-full">Active</span>
                         )}
                       </div>
 
-                      {periodEndDate && (
+                      {isTrialing && trialEndDate ? (
+                        <p className="text-sm text-purple-600">
+                          Trial ends: <span className="font-medium text-purple-950">{trialEndDate}</span>
+                          {' '}— your card will be charged automatically unless you cancel before then.
+                        </p>
+                      ) : periodEndDate ? (
                         <p className="text-sm text-purple-600">
                           {subscription.status === 'cancelling'
                             ? <>Access ends: <span className="font-medium text-purple-950">{periodEndDate}</span></>
                             : <>Next billing date: <span className="font-medium text-purple-950">{periodEndDate}</span></>
                           }
                         </p>
-                      )}
+                      ) : null}
 
                       {cancelMessage && (
                         <p className={`text-xs px-3 py-2 rounded-lg border ${
@@ -368,8 +405,8 @@ export default function SettingsPage() {
                         </p>
                       )}
 
-                      <div className="flex gap-3 pt-2">
-                        {subscription.status !== 'cancelling' && (
+                      <div className="flex gap-3 pt-2 flex-wrap">
+                        {subscription.status !== 'cancelling' && !isTrialing && (
                           <Link
                             href="/pricing"
                             className="text-sm font-medium bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-xl transition-colors"
@@ -386,7 +423,7 @@ export default function SettingsPage() {
                             onClick={() => setShowCancelConfirm(true)}
                             className="text-sm font-medium text-red-500 hover:text-red-700 border border-red-200 hover:border-red-400 bg-white px-4 py-2 rounded-xl transition-all"
                           >
-                            Cancel subscription
+                            {isTrialing ? 'Cancel trial' : 'Cancel subscription'}
                           </button>
                         )}
                       </div>
