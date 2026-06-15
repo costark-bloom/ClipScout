@@ -85,8 +85,7 @@ function SuccessContent() {
           </p>
           {trialEndStr && (
             <p className="text-purple-600 text-sm mb-8">
-              Your trial ends on <span className="font-semibold text-purple-950">{trialEndStr}</span> — we&apos;ll
-              email you the day before it converts.
+              Your trial ends on <span className="font-semibold text-purple-950">{trialEndStr}</span>.
             </p>
           )}
           {!trialEndStr && <div className="mb-8" />}
