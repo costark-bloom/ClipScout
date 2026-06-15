@@ -52,7 +52,7 @@ export default function TrialOffer({ onStartTrial, isLoading }: TrialOfferProps)
             Try ClipScout free for {TRIAL_OFFER.trialDays} days
           </h1>
           <p className="text-base text-purple-700 max-w-md mx-auto">
-            Full Creator plan access. Cancel anytime before your trial ends — we&apos;ll remind you.
+            Full Creator plan access. Cancel anytime before your trial ends.
           </p>
         </div>
 
