@@ -54,6 +54,19 @@ export default function OnboardingModal() {
     setMounted(true)
   }, [])
 
+  // The /pricing/success page dispatches this after verify-session writes
+  // onboarding_completed_at to the DB. Without it, our per-session cache
+  // (checkedForEmailRef) would keep needsOnboarding=true and the trial-offer
+  // modal would re-appear on the next non-suppressed route (e.g. /results).
+  useEffect(() => {
+    const handler = () => {
+      setNeedsOnboarding(false)
+      setSurveyAlreadyCompleted(false)
+    }
+    window.addEventListener('clipscout:onboarding-completed', handler)
+    return () => window.removeEventListener('clipscout:onboarding-completed', handler)
+  }, [])
+
   // Fetch onboarding status when auth resolves.
   useEffect(() => {
     if (status !== 'authenticated' || !session?.user?.email) {

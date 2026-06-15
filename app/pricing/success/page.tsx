@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import HomeHeader from '@/components/HomeHeader'
+import { trackEvent } from '@/lib/analytics'
 
 interface VerifyResult {
   isTrial?: boolean
@@ -23,11 +24,43 @@ function formatTrialEnd(iso: string | null | undefined): string | null {
   }
 }
 
+/**
+ * Detects whether the user had a search in-flight when they were sent through
+ * the trial flow. We look at the persisted Zustand snapshot in sessionStorage
+ * (not the live hook — this runs in a useEffect, no hydration to wait for).
+ *
+ * The script and segments are persisted by useAppStore's `persist` middleware,
+ * and sessionStorage survives the Stripe round-trip (same tab, same origin).
+ * If both are present, the user was mid-search before the auth/trial gate —
+ * we should route them back to /results, not /, so they don't have to retype.
+ */
+function detectPendingSearch(): boolean {
+  if (typeof window === 'undefined') return false
+  try {
+    const raw = sessionStorage.getItem('clipscout-session')
+    if (!raw) return false
+    const parsed = JSON.parse(raw)
+    const state = parsed?.state ?? {}
+    const hasScript = typeof state.script === 'string' && state.script.trim().length > 0
+    const hasSegments = Array.isArray(state.segments) && state.segments.length > 0
+    return hasScript && hasSegments
+  } catch {
+    return false
+  }
+}
+
 function SuccessContent() {
   const searchParams = useSearchParams()
   const sessionId = searchParams.get('session_id')
   const [status, setStatus] = useState<'verifying' | 'done' | 'error'>('verifying')
   const [result, setResult] = useState<VerifyResult>({})
+  // Detected once on mount. We don't re-check on every render because the
+  // user might click "Continue" → /results between renders and we'd lose it.
+  const [hasPendingSearch, setHasPendingSearch] = useState(false)
+
+  useEffect(() => {
+    setHasPendingSearch(detectPendingSearch())
+  }, [])
 
   useEffect(() => {
     if (!sessionId) { setStatus('done'); return }
@@ -45,6 +78,14 @@ function SuccessContent() {
         } else {
           setResult({ isTrial: d.isTrial, trialEndsAt: d.trialEndsAt })
           setStatus('done')
+          // Tell the layout-mounted OnboardingModal to drop its cached
+          // `needsOnboarding=true` state. Without this, navigating back to
+          // /results would re-trigger the trial-offer modal even though the
+          // user just paid (the modal otherwise only refetches status once
+          // per session in checkedForEmailRef).
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('clipscout:onboarding-completed'))
+          }
         }
       })
       .catch(() => setStatus('error'))
@@ -100,18 +141,41 @@ function SuccessContent() {
       )}
 
       <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-        <Link
-          href="/"
-          className="w-full sm:w-auto bg-purple-600 hover:bg-purple-700 text-white font-semibold px-6 py-3 rounded-xl transition-colors text-sm"
-        >
-          Find b-roll now
-        </Link>
-        <Link
-          href="/scripts"
-          className="w-full sm:w-auto bg-white hover:bg-purple-50 text-purple-700 font-semibold px-6 py-3 rounded-xl border border-purple-200 hover:border-purple-400 transition-all text-sm"
-        >
-          My scripts
-        </Link>
+        {hasPendingSearch ? (
+          <>
+            <Link
+              href="/results"
+              onClick={() => trackEvent('Trial Success — Continue Search Clicked')}
+              className="w-full sm:w-auto bg-purple-600 hover:bg-purple-700 text-white font-semibold px-6 py-3 rounded-xl transition-colors text-sm"
+            >
+              Continue your search →
+            </Link>
+            <Link
+              href="/"
+              onClick={() => trackEvent('Trial Success — New Search Clicked')}
+              className="w-full sm:w-auto bg-white hover:bg-purple-50 text-purple-700 font-semibold px-6 py-3 rounded-xl border border-purple-200 hover:border-purple-400 transition-all text-sm"
+            >
+              Start a new search
+            </Link>
+          </>
+        ) : (
+          <>
+            <Link
+              href="/"
+              onClick={() => trackEvent('Trial Success — Find B-Roll Clicked')}
+              className="w-full sm:w-auto bg-purple-600 hover:bg-purple-700 text-white font-semibold px-6 py-3 rounded-xl transition-colors text-sm"
+            >
+              Find b-roll now
+            </Link>
+            <Link
+              href="/scripts"
+              onClick={() => trackEvent('Trial Success — My Scripts Clicked')}
+              className="w-full sm:w-auto bg-white hover:bg-purple-50 text-purple-700 font-semibold px-6 py-3 rounded-xl border border-purple-200 hover:border-purple-400 transition-all text-sm"
+            >
+              My scripts
+            </Link>
+          </>
+        )}
       </div>
     </>
   )
