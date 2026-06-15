@@ -11,11 +11,20 @@ const supabase = createClient(
 )
 
 /**
- * Marks the current user as having completed onboarding and stores their
- * survey responses. Idempotent: safe to call multiple times. We deliberately
- * don't gate this on the user picking a paid plan — survey data is valuable
- * even for users who bail at the trial-offer step (helps us learn what
- * blocked them).
+ * Stores the current user's survey responses. Idempotent: safe to call
+ * multiple times. Survey data is valuable even for users who bail at the
+ * trial-offer step, so we save responses unconditionally here.
+ *
+ * IMPORTANT: this route deliberately does NOT set onboarding_completed_at.
+ * That used to live here, but it caused a paywall-bypass bug: a user who
+ * clicked "Start trial", got redirected to Stripe, and closed the tab
+ * without entering a card would be marked complete and the onboarding
+ * modal would never re-show. They'd silently slip past the trial gate.
+ *
+ * onboarding_completed_at is now set ONLY when payment is verified — in
+ * /api/stripe/verify-session and the checkout.session.completed webhook.
+ * That way the modal keeps re-prompting users until they actually start
+ * the trial (or sign out).
  */
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions)
@@ -28,13 +37,12 @@ export async function POST(req: NextRequest) {
   try {
     body = await req.json()
   } catch {
-    // Empty body is fine — caller may just want to mark complete.
+    // Empty body is fine — caller may just want to upsert with no responses.
   }
 
   const { error } = await supabase
     .from('users')
     .update({
-      onboarding_completed_at: new Date().toISOString(),
       onboarding_responses: {
         ...(body.responses ?? {}),
         ...(body.selected_interval ? { _selected_interval: body.selected_interval } : {}),

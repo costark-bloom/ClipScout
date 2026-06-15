@@ -41,6 +41,10 @@ export default function OnboardingModal() {
   const pathname = usePathname()
   const [mounted, setMounted] = useState(false)
   const [needsOnboarding, setNeedsOnboarding] = useState(false)
+  // True when the user has already submitted survey responses (e.g., they
+  // bailed at the Stripe checkout the first time). When true we skip them
+  // straight to the trial offer instead of making them re-answer 6 questions.
+  const [surveyAlreadyCompleted, setSurveyAlreadyCompleted] = useState(false)
 
   // Per-session memo so we only hit /api/onboarding/status once per login.
   const checkedForEmailRef = useRef<string | null>(null)
@@ -69,11 +73,13 @@ export default function OnboardingModal() {
         if (cancelled) return
         checkedForEmailRef.current = email
         setNeedsOnboarding(!!data.needsOnboarding)
+        setSurveyAlreadyCompleted(!!data.surveyAlreadyCompleted)
       })
       .catch(() => {
         // Network blip — fail open, never trap the user.
         checkedForEmailRef.current = email
         setNeedsOnboarding(false)
+        setSurveyAlreadyCompleted(false)
       })
 
     return () => {
@@ -114,6 +120,7 @@ export default function OnboardingModal() {
           options still have room to breathe. */}
       <div className="relative w-full max-w-lg h-[min(720px,92vh)] bg-white rounded-2xl shadow-2xl shadow-purple-950/30 overflow-hidden flex flex-col">
         <OnboardingFlow
+          skipToTrialOffer={surveyAlreadyCompleted}
           onComplete={() => {
             setNeedsOnboarding(false)
           }}

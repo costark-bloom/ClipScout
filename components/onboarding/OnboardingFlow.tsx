@@ -39,19 +39,39 @@ interface OnboardingFlowProps {
   /** Called after the user successfully starts checkout (no-op for now since
    *  we redirect to Stripe, but reserved for non-trial completion paths). */
   onComplete?: () => void
+  /**
+   * When true, jump straight to the TrialOffer step. Used for users who
+   * already filled out the survey but bailed at the Stripe checkout — no
+   * point in re-asking 6 questions they already answered.
+   */
+  skipToTrialOffer?: boolean
 }
 
-export default function OnboardingFlow({ onComplete: _onComplete }: OnboardingFlowProps) {
+export default function OnboardingFlow({
+  onComplete: _onComplete,
+  skipToTrialOffer = false,
+}: OnboardingFlowProps) {
   const steps = useMemo(buildSteps, [])
   const totalSteps = steps.length
 
-  const [currentStep, setCurrentStep] = useState(0)
+  // Find the index of the 'offer' step at module init — used both as the
+  // initial step when skipping and to keep the back button safe (we don't
+  // want to let returning users navigate back into the survey they already
+  // completed; the data is already saved server-side anyway).
+  const offerStepIndex = useMemo(
+    () => steps.findIndex((s) => s.phase === 'offer'),
+    [steps],
+  )
+
+  const [currentStep, setCurrentStep] = useState(() =>
+    skipToTrialOffer && offerStepIndex >= 0 ? offerStepIndex : 0,
+  )
   const [answers, setAnswers] = useState<SurveyAnswers>({})
   const [isStartingTrial, setIsStartingTrial] = useState(false)
 
   useEffect(() => {
-    trackEvent('Onboarding — Started')
-  }, [])
+    trackEvent('Onboarding — Started', { resumed: skipToTrialOffer })
+  }, [skipToTrialOffer])
 
   const step = steps[currentStep]
 
@@ -147,11 +167,16 @@ export default function OnboardingFlow({ onComplete: _onComplete }: OnboardingFl
     }
   }
 
+  // Disable Back for users who jumped straight to the offer — letting them
+  // navigate into survey/value screens with empty answers would just create
+  // a half-broken experience. They've already answered, server has the data.
+  const canGoBack = !skipToTrialOffer && currentStep > 0
+
   return (
     <OnboardingShell
       stepIndex={currentStep}
       totalSteps={totalSteps}
-      onBack={currentStep > 0 ? goBack : undefined}
+      onBack={canGoBack ? goBack : undefined}
       onSignOut={handleSignOut}
     >
       {step.phase === 'value' && (

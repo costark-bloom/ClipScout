@@ -26,7 +26,7 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from('users')
-    .select('onboarding_completed_at')
+    .select('onboarding_completed_at, onboarding_responses')
     .eq('email', session.user.email.toLowerCase())
     .single()
 
@@ -35,11 +35,25 @@ export async function GET() {
   // Only a confirmed-null timestamp on an existing row means "needs onboarding".
   if (error || !data) {
     if (error) console.error('[onboarding/status]', error.message)
-    return NextResponse.json({ authenticated: true, needsOnboarding: false })
+    return NextResponse.json({
+      authenticated: true,
+      needsOnboarding: false,
+      surveyAlreadyCompleted: false,
+    })
   }
+
+  // surveyAlreadyCompleted is true if the user has previously walked through
+  // the survey but never completed the trial checkout (e.g., they bailed at
+  // the Stripe page). Used by the client to skip them straight to the
+  // TrialOffer step instead of re-asking 6 questions they already answered.
+  const surveyAlreadyCompleted =
+    !!data.onboarding_responses &&
+    typeof data.onboarding_responses === 'object' &&
+    Object.keys(data.onboarding_responses).length > 0
 
   return NextResponse.json({
     authenticated: true,
     needsOnboarding: !data.onboarding_completed_at,
+    surveyAlreadyCompleted,
   })
 }

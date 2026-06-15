@@ -1,9 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/app/api/auth/[...nextauth]/route'
+import { createClient } from '@supabase/supabase-js'
 import { stripe } from '@/lib/stripe'
 import { supabase } from '@/lib/supabase'
 import { grantSubscriptionCredits } from '@/lib/credits'
+
+// Service-role client for writes to the `users` table (RLS would block the
+// anon client). Used to flip onboarding_completed_at once Stripe confirms.
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+)
+
+/**
+ * Marks the user's onboarding as complete and dismisses the modal for good.
+ * Called only after Stripe has confirmed the trial / payment — never before,
+ * otherwise users can bail at the Stripe page and silently slip past the
+ * paywall. Idempotent: re-runs harmlessly if already set.
+ */
+async function markOnboardingComplete(email: string) {
+  const { error } = await supabaseAdmin
+    .from('users')
+    .update({ onboarding_completed_at: new Date().toISOString() })
+    .eq('email', email.toLowerCase())
+    .is('onboarding_completed_at', null)
+  if (error) console.error('[verify-session] markOnboardingComplete:', error)
+}
 
 const PLAN_CREDITS: Record<string, number> = {
   creator: 75,
@@ -63,6 +86,10 @@ export async function POST(req: NextRequest) {
       existing?.subscription_plan === planId &&
       activeStatuses.includes(existing?.subscription_status ?? '')
     ) {
+      // Webhook already updated the row, but still make sure the onboarding
+      // gate is closed — covers the case where the webhook race-d ahead of
+      // verify-session but didn't flip the user-level flag itself.
+      await markOnboardingComplete(userEmail)
       return NextResponse.json({
         alreadyUpdated: true,
         planId,
@@ -107,6 +134,10 @@ export async function POST(req: NextRequest) {
     )
 
     await grantSubscriptionCredits(userEmail, planId)
+    // Now that Stripe has confirmed payment/trial, close the onboarding gate.
+    // (Previously this flag was set in /api/onboarding/complete, which let
+    // users who bailed at the Stripe page silently slip past the paywall.)
+    await markOnboardingComplete(userEmail)
     console.log(
       `[verify-session] ${status === 'trialing' ? 'trial started' : 'subscription applied'} ` +
         `for ${userEmail} (${planId}/${interval})`,

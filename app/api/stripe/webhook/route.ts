@@ -1,8 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
 import { stripe } from '@/lib/stripe'
 import { supabase } from '@/lib/supabase'
 import { grantSubscriptionCredits } from '@/lib/credits'
 import type Stripe from 'stripe'
+
+// Service-role client for writes to the `users` table (RLS-protected).
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+)
+
+/**
+ * Closes the onboarding gate once Stripe confirms trial/payment. Idempotent.
+ * Also fires from /api/stripe/verify-session — whichever runs first wins.
+ */
+async function markOnboardingComplete(email: string) {
+  const { error } = await supabaseAdmin
+    .from('users')
+    .update({ onboarding_completed_at: new Date().toISOString() })
+    .eq('email', email.toLowerCase())
+    .is('onboarding_completed_at', null)
+  if (error) console.error('[webhook] markOnboardingComplete:', error)
+}
 
 export const config = { api: { bodyParser: false } }
 
@@ -85,6 +105,10 @@ export async function POST(req: NextRequest) {
         // We want trial users to actually USE the product during their 3 days —
         // gating credits behind the first invoice defeats the funnel.
         await grantSubscriptionCredits(userEmail, planId)
+
+        // Stripe has confirmed the user — close the onboarding gate so the
+        // modal stops re-prompting them.
+        await markOnboardingComplete(userEmail)
 
         console.log(
           `[webhook] ${sub.status === 'trialing' ? 'trial started' : 'subscription activated'} ` +
