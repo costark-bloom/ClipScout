@@ -9,9 +9,6 @@ interface OnboardingShellProps {
   totalSteps: number
   /** Optional handler — when omitted the back button is hidden. */
   onBack?: () => void
-  /** Optional handler — adds an unobtrusive "Sign out" escape hatch in the
-   *  footer so the user isn't fully trapped if they change their mind. */
-  onSignOut?: () => void
   children: ReactNode
 }
 
@@ -24,7 +21,6 @@ export default function OnboardingShell({
   stepIndex,
   totalSteps,
   onBack,
-  onSignOut,
   children,
 }: OnboardingShellProps) {
   const pct = Math.min(100, Math.max(0, ((stepIndex + 1) / totalSteps) * 100))
@@ -67,20 +63,6 @@ export default function OnboardingShell({
           {children}
         </div>
       </div>
-
-      {/* Persistent footer outside the scroller so it doesn't push content
-          past the modal edge. Subtle on purpose — we don't want to flag the
-          escape hatch too loudly. */}
-      {onSignOut && (
-        <div className="shrink-0 border-t border-purple-100 bg-white/70 backdrop-blur-md text-center py-2.5">
-          <button
-            onClick={onSignOut}
-            className="text-xs text-purple-400 hover:text-purple-700 transition-colors underline underline-offset-2"
-          >
-            Not now — sign out
-          </button>
-        </div>
-      )}
     </div>
   )
 }

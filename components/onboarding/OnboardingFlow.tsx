@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { signOut } from 'next-auth/react'
 import OnboardingShell from './OnboardingShell'
 import ValueScreens from './ValueScreens'
 import SurveyStep from './SurveyStep'
@@ -128,11 +127,6 @@ export default function OnboardingFlow({
     return out
   }
 
-  const handleSignOut = async () => {
-    trackEvent('Onboarding — Sign Out Clicked')
-    await signOut({ callbackUrl: '/' })
-  }
-
   const handleStartTrial = async (interval: 'monthly' | 'annual') => {
     setIsStartingTrial(true)
     try {
@@ -177,7 +171,6 @@ export default function OnboardingFlow({
       stepIndex={currentStep}
       totalSteps={totalSteps}
       onBack={canGoBack ? goBack : undefined}
-      onSignOut={handleSignOut}
     >
       {step.phase === 'value' && (
         <ValueScreens slideIndex={step.index} onContinue={goNext} />
