@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { ADMIN_CREDIT_BALANCE, isAdminEmail } from './admin'
 
 const FREE_TRIAL_CREDITS = 3
 
@@ -13,6 +14,9 @@ const PLAN_CREDITS: Record<string, number> = {
  * If no row exists, initialize with 3 free trial credits.
  */
 export async function getCreditsRemaining(userEmail: string): Promise<number> {
+  // Admin allowlist — return synthetic high balance, never read or create rows.
+  if (isAdminEmail(userEmail)) return ADMIN_CREDIT_BALANCE
+
   const { data } = await supabase
     .from('user_settings')
     .select('credits_remaining, subscription_plan, subscription_status')
@@ -37,6 +41,9 @@ export async function getCreditsRemaining(userEmail: string): Promise<number> {
  * Returns the new credits_remaining value.
  */
 export async function deductCredit(userEmail: string): Promise<number> {
+  // Admin allowlist — no-op. Synthetic balance is what's reported to the UI.
+  if (isAdminEmail(userEmail)) return ADMIN_CREDIT_BALANCE
+
   const { data } = await supabase
     .from('user_settings')
     .select('credits_remaining, credits_used')

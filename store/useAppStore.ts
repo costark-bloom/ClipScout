@@ -8,9 +8,13 @@ import { ALL_VIDEO_SOURCES } from '@/lib/types'
 interface AppStateWithHydration extends AppState {
   _hasHydrated: boolean
   showUpgradeModal: boolean
+  /** Non-null when the user hit a SUBSCRIPTION_INACTIVE 402 — the status
+   *  string drives the PaymentIssueModal's copy + CTAs. */
+  paymentIssueStatus: string | null
   isExampleScript: boolean
   setHasHydrated: (value: boolean) => void
   setShowUpgradeModal: (value: boolean) => void
+  setPaymentIssueStatus: (value: string | null) => void
   setIsExampleScript: (value: boolean) => void
 }
 const useAppStore = create<AppStateWithHydration>()(
@@ -26,6 +30,7 @@ const useAppStore = create<AppStateWithHydration>()(
       error: null,
       _hasHydrated: false,
       showUpgradeModal: false,
+      paymentIssueStatus: null,
       scriptChunkOffsets: [],
       scriptChunkCount: 1,
       savedScriptContext: '',
@@ -37,6 +42,7 @@ const useAppStore = create<AppStateWithHydration>()(
 
       setHasHydrated: (value: boolean) => set({ _hasHydrated: value }),
       setShowUpgradeModal: (value: boolean) => set({ showUpgradeModal: value }),
+      setPaymentIssueStatus: (value: string | null) => set({ paymentIssueStatus: value }),
       setIsExampleScript: (value: boolean) => set({ isExampleScript: value }),
       setIsKeywordMode: (value: boolean) => set({ isKeywordMode: value }),
       setKeywordChipCount: (count: number) => set({ keywordChipCount: count }),
@@ -108,6 +114,7 @@ const useAppStore = create<AppStateWithHydration>()(
           chapterStatus: {},
           error: null,
           showUpgradeModal: false,
+          paymentIssueStatus: null,
           isExampleScript: false,
           isKeywordMode: false,
           keywordChipCount: 0,

@@ -10,6 +10,7 @@ import LoadingState from '@/components/LoadingState'
 import AuthGate, { useAuthGate } from '@/components/AuthGate'
 import UserMenu from '@/components/UserMenu'
 import UpgradeModal from '@/components/UpgradeModal'
+import PaymentIssueModal from '@/components/PaymentIssueModal'
 import SourceFilter from '@/components/SourceFilter'
 import type { ScriptSegment, VideoResult, VideoSource } from '@/lib/types'
 import { ALL_VIDEO_SOURCES, videoToSource } from '@/lib/types'
@@ -63,6 +64,8 @@ export default function ResultsPage() {
     error,
     showUpgradeModal,
     setShowUpgradeModal,
+    paymentIssueStatus,
+    setPaymentIssueStatus,
     _hasHydrated,
     setActiveSegment,
     setChapterStatus,
@@ -262,6 +265,11 @@ export default function ResultsPage() {
 
         if (!res.ok) {
           const err = await res.json()
+          if (err.error === 'SUBSCRIPTION_INACTIVE') {
+            setChapterStatus(chapterNum, 'idle')
+            setPaymentIssueStatus(typeof err.status === 'string' ? err.status : 'past_due')
+            return
+          }
           if (res.status === 402 || err.error === 'INSUFFICIENT_CREDITS') {
             setChapterStatus(chapterNum, 'idle')
             setShowUpgradeModal(true)
@@ -368,6 +376,10 @@ export default function ResultsPage() {
       if (!credRes.ok) {
         const errData = await credRes.json().catch(() => ({}))
         setLoadingChapterInScript(null)
+        if (errData.error === 'SUBSCRIPTION_INACTIVE') {
+          setPaymentIssueStatus(typeof errData.status === 'string' ? errData.status : 'past_due')
+          return
+        }
         if (credRes.status === 402 || errData.error === 'INSUFFICIENT_CREDITS') {
           setShowUpgradeModal(true)
           return
@@ -396,6 +408,11 @@ export default function ResultsPage() {
           for (const line of lines) {
             if (!line.trim()) continue
             const parsed = JSON.parse(line)
+            if (parsed.error === 'SUBSCRIPTION_INACTIVE') {
+              setPaymentIssueStatus(typeof parsed.status === 'string' ? parsed.status : 'past_due')
+              setLoadingChapterInScript(null)
+              return
+            }
             if (parsed.error === 'INSUFFICIENT_CREDITS') {
               setShowUpgradeModal(true)
               setLoadingChapterInScript(null)
@@ -520,7 +537,15 @@ export default function ResultsPage() {
         }),
       })
       if (res.status === 402) {
-        setShowUpgradeModal(true)
+        // Distinguish SUBSCRIPTION_INACTIVE from INSUFFICIENT_CREDITS so the
+        // user gets the right modal — past_due users were previously told
+        // they'd used their free credits.
+        const err = await res.json().catch(() => ({}))
+        if (err.error === 'SUBSCRIPTION_INACTIVE') {
+          setPaymentIssueStatus(typeof err.status === 'string' ? err.status : 'past_due')
+        } else {
+          setShowUpgradeModal(true)
+        }
       } else if (res.ok) {
         const { results, segments: updatedSegments } = await res.json()
         if (Array.isArray(updatedSegments)) {
@@ -676,6 +701,15 @@ export default function ResultsPage() {
       {/* Upgrade modal — shown when credits run out */}
       {showUpgradeModal && (
         <UpgradeModal onClose={() => setShowUpgradeModal(false)} isFreeTrial={isFreeTrial} />
+      )}
+
+      {/* Payment-issue modal — shown when subscription status blocks spending
+          (past_due, unpaid, canceled, etc.) regardless of credit balance */}
+      {paymentIssueStatus && (
+        <PaymentIssueModal
+          status={paymentIssueStatus}
+          onClose={() => setPaymentIssueStatus(null)}
+        />
       )}
 
 
@@ -1086,6 +1120,7 @@ export default function ResultsPage() {
                               hiddenBySourceFilter={countHiddenBySources(result?.videos ?? [], enabledSources)}
                               onIntersect={handleSegmentIntersect}
                               onInsufficientCredits={() => setShowUpgradeModal(true)}
+                              onSubscriptionInactive={(status) => setPaymentIssueStatus(status)}
                             />
                           )
                         })}

@@ -3,7 +3,8 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/app/api/auth/[...nextauth]/route'
 import { analyzeChunk, validateSegments, generateScriptContext } from '@/lib/claude'
 import { splitIntoChunks } from '@/lib/chunks'
-import { getCreditsRemaining, deductCredit } from '@/lib/credits'
+import { deductCredit } from '@/lib/credits'
+import { getSubscriptionAccess } from '@/lib/access'
 import type { ScriptSegment } from '@/lib/types'
 
 export const maxDuration = 60
@@ -31,10 +32,20 @@ export async function POST(request: NextRequest) {
     })
   }
 
-  // Only enforce credit limits for authenticated users
+  // Only enforce credit/subscription limits for authenticated users.
+  // The access check distinguishes "out of credits" (upgrade modal) from
+  // "payment failed / subscription inactive" (payment-issue modal) so the
+  // user gets the right CTA — fixes the bug where past_due users were told
+  // they'd used their free trial credits.
   if (userEmail) {
-    const creditsRemaining = await getCreditsRemaining(userEmail)
-    if (creditsRemaining < 1) {
+    const access = await getSubscriptionAccess(userEmail, 1)
+    if (access.kind === 'inactive') {
+      return new Response(
+        JSON.stringify({ error: 'SUBSCRIPTION_INACTIVE', status: access.status }),
+        { status: 402, headers: { 'Content-Type': 'application/json' } },
+      )
+    }
+    if (access.kind === 'no_credits') {
       return new Response(JSON.stringify({ error: 'INSUFFICIENT_CREDITS' }), {
         status: 402,
         headers: { 'Content-Type': 'application/json' },

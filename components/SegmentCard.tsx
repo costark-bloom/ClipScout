@@ -16,6 +16,9 @@ interface SegmentCardProps {
   hiddenBySourceFilter?: number
   onIntersect: (segmentId: string) => void
   onInsufficientCredits?: () => void
+  /** Fired when /api/search/more rejects with SUBSCRIPTION_INACTIVE (past_due,
+   *  canceled, etc.). The status string lets the parent pick the right copy. */
+  onSubscriptionInactive?: (status: string) => void
 }
 
 type LoadMoreState = 'idle' | 'loading' | 'done' | 'error'
@@ -27,6 +30,7 @@ export default function SegmentCard({
   hiddenBySourceFilter = 0,
   onIntersect,
   onInsufficientCredits,
+  onSubscriptionInactive,
 }: SegmentCardProps) {
   const { activeSegmentId, setActiveSegment, appendVideosToSegment, videoOrientation, enabledSources, setEnabledSources } = useAppStore()
   const { status: authStatus } = useSession()
@@ -97,7 +101,14 @@ export default function SegmentCard({
 
       if (res.status === 402) {
         setLoadMoreState('idle')
-        onInsufficientCredits?.()
+        const errBody = await res.json().catch(() => ({}))
+        if (errBody.error === 'SUBSCRIPTION_INACTIVE') {
+          onSubscriptionInactive?.(
+            typeof errBody.status === 'string' ? errBody.status : 'past_due',
+          )
+        } else {
+          onInsufficientCredits?.()
+        }
         return
       }
 

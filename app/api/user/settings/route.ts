@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/app/api/auth/[...nextauth]/route'
 import { supabase } from '@/lib/supabase'
+import { ADMIN_CREDIT_BALANCE, isAdminEmail } from '@/lib/admin'
 
 export async function GET() {
   const session = await getServerSession(authOptions)
@@ -15,6 +16,12 @@ export async function GET() {
     .eq('user_email', session.user.email)
     .single()
 
+  // Admin allowlist override — report a synthetic high credit count + active
+  // status so the UI never triggers a soft credit gate or payment-issue modal
+  // regardless of what's actually in the DB. Lets us live-test on prod
+  // without spending credits or maintaining a real subscription.
+  const isAdmin = isAdminEmail(session.user.email)
+
   return NextResponse.json({
     freepikApiKey: data?.freepik_api_key
       ? `${data.freepik_api_key.slice(0, 6)}${'•'.repeat(20)}`
@@ -22,11 +29,11 @@ export async function GET() {
     hasFreepikKey: !!data?.freepik_api_key,
     subscription_plan: data?.subscription_plan ?? null,
     subscription_interval: data?.subscription_interval ?? null,
-    subscription_status: data?.subscription_status ?? null,
+    subscription_status: isAdmin ? 'active' : (data?.subscription_status ?? null),
     subscription_period_end: data?.subscription_period_end ?? null,
     trial_started_at: data?.trial_started_at ?? null,
     trial_ends_at: data?.trial_ends_at ?? null,
-    credits_remaining: data?.credits_remaining ?? 3,
+    credits_remaining: isAdmin ? ADMIN_CREDIT_BALANCE : (data?.credits_remaining ?? 3),
     credits_used: data?.credits_used ?? 0,
   })
 }

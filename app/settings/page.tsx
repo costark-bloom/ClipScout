@@ -38,6 +38,7 @@ export default function SettingsPage() {
   const [cancelling, setCancelling] = useState(false)
   const [cancelMessage, setCancelMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [showCancelConfirm, setShowCancelConfirm] = useState(false)
+  const [openingPortal, setOpeningPortal] = useState(false)
 
   // Integrations
   const [freepikKey, setFreepikKey] = useState('')
@@ -167,6 +168,36 @@ export default function SettingsPage() {
     subscription.status === 'active' ||
     subscription.status === 'cancelling' ||
     isTrialing
+  // Past due / unpaid: card on file failed when Stripe tried to charge it.
+  // We surface a prominent banner with a portal link so the user can fix it
+  // without having to find their way to Stripe on their own.
+  const isPaymentIssue =
+    subscription.status === 'past_due' || subscription.status === 'unpaid'
+
+  const openBillingPortal = async () => {
+    trackEvent('Settings — Open Portal Clicked', { status: subscription.status })
+    setOpeningPortal(true)
+    try {
+      const res = await fetch('/api/stripe/portal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          returnUrl: typeof window !== 'undefined' ? window.location.href : undefined,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data.url) throw new Error(data.error || 'Portal unavailable')
+      window.location.href = data.url
+    } catch (err) {
+      console.error('[settings] portal error:', err)
+      alert(
+        err instanceof Error
+          ? err.message
+          : "We couldn't open the billing portal. Try again in a moment.",
+      )
+      setOpeningPortal(false)
+    }
+  }
   const periodEndDate = subscription.periodEnd
     ? new Date(subscription.periodEnd).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
     : null
@@ -359,18 +390,54 @@ export default function SettingsPage() {
             {/* ── BILLING ── */}
             {tab === 'billing' && (
               <div className="space-y-4">
+                {/* Payment-issue banner — pinned at top so it's the first thing
+                    a past_due/unpaid user sees on this tab. */}
+                {isPaymentIssue && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center gap-4">
+                    <div className="flex items-start sm:items-center gap-3 flex-1">
+                      <div className="w-10 h-10 rounded-xl bg-amber-100 border border-amber-200 flex items-center justify-center shrink-0">
+                        <svg className="w-5 h-5 text-amber-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+                        </svg>
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold text-amber-900">
+                          {subscription.status === 'past_due'
+                            ? 'Your last payment failed'
+                            : 'Your subscription is unpaid'}
+                        </p>
+                        <p className="text-xs text-amber-800 mt-0.5 leading-relaxed">
+                          Your card on file was declined. Update your payment method to
+                          keep using ClipScout — your access is currently paused.
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={openBillingPortal}
+                      disabled={openingPortal}
+                      className="bg-amber-600 hover:bg-amber-700 disabled:bg-amber-300 disabled:cursor-not-allowed text-white font-semibold text-sm px-4 py-2.5 rounded-xl transition-colors whitespace-nowrap shrink-0"
+                    >
+                      {openingPortal ? 'Opening…' : 'Update payment method'}
+                    </button>
+                  </div>
+                )}
+
                 {/* Current plan */}
                 <div className="bg-white/80 border border-purple-200 rounded-2xl p-6 backdrop-blur-sm shadow-sm">
                   <h2 className="text-base font-bold text-purple-950 mb-4">Current plan</h2>
 
-                  {planInfo && isActive ? (
+                  {planInfo && (isActive || isPaymentIssue) ? (
                     <div className="space-y-4">
                       <div className="flex items-center gap-3 flex-wrap">
                         <span className={`text-sm font-bold px-3 py-1 rounded-full border ${planInfo.color}`}>
                           {planInfo.label}
                         </span>
                         <span className="text-xs text-purple-500 capitalize">{subscription.interval} billing</span>
-                        {subscription.status === 'cancelling' ? (
+                        {isPaymentIssue ? (
+                          <span className="text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
+                            {subscription.status === 'past_due' ? 'Payment failed' : 'Unpaid'}
+                          </span>
+                        ) : subscription.status === 'cancelling' ? (
                           <span className="text-xs font-medium text-orange-600 bg-orange-50 border border-orange-200 px-2 py-0.5 rounded-full">Cancels at period end</span>
                         ) : isTrialing ? (
                           <span className="text-xs font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-full">

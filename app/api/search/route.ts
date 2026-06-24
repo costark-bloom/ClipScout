@@ -8,7 +8,8 @@ import { searchFreepik } from '@/lib/freepik'
 import { enrichWithTranscripts } from '@/lib/transcript-matcher'
 import { enrichWithMetadata } from '@/lib/metadata-matcher'
 import { generateFallbackQueries, prepareKeywordForSearch } from '@/lib/claude'
-import { getCreditsRemaining, deductCredit } from '@/lib/credits'
+import { deductCredit } from '@/lib/credits'
+import { getSubscriptionAccess } from '@/lib/access'
 import { supabase } from '@/lib/supabase'
 import type { ScriptSegment, SearchResults, VideoResult, VideoOrientation, VideoSource } from '@/lib/types'
 import { ALL_VIDEO_SOURCES } from '@/lib/types'
@@ -302,8 +303,14 @@ export async function POST(request: NextRequest) {
       : segments.length
 
     if (deductCreditsPerSegment && userEmail && creditCount > 0) {
-      const creditsRemaining = await getCreditsRemaining(userEmail)
-      if (creditsRemaining < creditCount) {
+      const access = await getSubscriptionAccess(userEmail, creditCount)
+      if (access.kind === 'inactive') {
+        return NextResponse.json(
+          { error: 'SUBSCRIPTION_INACTIVE', status: access.status },
+          { status: 402 },
+        )
+      }
+      if (access.kind === 'no_credits') {
         return NextResponse.json({ error: 'INSUFFICIENT_CREDITS' }, { status: 402 })
       }
     }

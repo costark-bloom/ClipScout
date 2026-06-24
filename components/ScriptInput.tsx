@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import useAppStore from '@/store/useAppStore'
 import UpgradeModal from '@/components/UpgradeModal'
+import PaymentIssueModal from '@/components/PaymentIssueModal'
 import SourceFilter from '@/components/SourceFilter'
 import { splitIntoChunks } from '@/lib/chunks'
 import { trackEvent } from '@/lib/analytics'
@@ -38,6 +39,7 @@ export default function ScriptInput() {
   const {
     setScript, addSegments, setIsAnalyzing, setError, reset,
     showUpgradeModal, setShowUpgradeModal,
+    paymentIssueStatus, setPaymentIssueStatus,
     setScriptChunks, setSavedScriptContext,
     videoOrientation, setVideoOrientation,
     setIsExampleScript, setIsKeywordMode, setKeywordChipCount,
@@ -147,6 +149,12 @@ export default function ScriptInput() {
 
       if (!analyzeRes.ok || !analyzeRes.body) {
         const err = await analyzeRes.json()
+        if (err.error === 'SUBSCRIPTION_INACTIVE') {
+          setIsAnalyzing(false)
+          setPaymentIssueStatus(typeof err.status === 'string' ? err.status : 'past_due')
+          setIsSubmitting(false)
+          return
+        }
         if (analyzeRes.status === 402 || err.error === 'INSUFFICIENT_CREDITS') {
           setIsAnalyzing(false)
           setShowUpgradeModal(true)
@@ -169,6 +177,12 @@ export default function ScriptInput() {
         for (const line of lines) {
           if (!line.trim()) continue
           const parsed = JSON.parse(line)
+          if (parsed.error === 'SUBSCRIPTION_INACTIVE') {
+            setIsAnalyzing(false)
+            setPaymentIssueStatus(typeof parsed.status === 'string' ? parsed.status : 'past_due')
+            setIsSubmitting(false)
+            return
+          }
           if (parsed.error === 'INSUFFICIENT_CREDITS') {
             setIsAnalyzing(false)
             setShowUpgradeModal(true)
@@ -315,6 +329,12 @@ export default function ScriptInput() {
   return (
     <>
       {showUpgradeModal && <UpgradeModal onClose={() => setShowUpgradeModal(false)} isFreeTrial={true} />}
+      {paymentIssueStatus && (
+        <PaymentIssueModal
+          status={paymentIssueStatus}
+          onClose={() => setPaymentIssueStatus(null)}
+        />
+      )}
       <div className="w-full max-w-3xl mx-auto space-y-4">
 
         {/* Mode toggle */}
