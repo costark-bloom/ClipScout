@@ -13,6 +13,10 @@
 const ADMIN_EMAILS = new Set<string>(
   [
     'cole.stark9@gmail.com',
+    // Shared demo account for Upwork contractors (ProductHunt launch assets,
+    // demo video, etc.) so they can use the live product without burning real
+    // credits or going through Stripe.
+    'clipscout.contractor.2026@mailinator.com',
   ].map((e) => e.toLowerCase()),
 )
 

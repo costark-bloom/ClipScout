@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/app/api/auth/[...nextauth]/route'
 import { createClient } from '@supabase/supabase-js'
+import { isAdminEmail } from '@/lib/admin'
 
 // Use the service-role key here to bypass RLS — the shared `@/lib/supabase`
 // client uses the anon key, which can't read other users' rows in `users`.
@@ -22,6 +23,17 @@ export async function GET() {
   const session = await getServerSession(authOptions)
   if (!session?.user?.email) {
     return NextResponse.json({ needsOnboarding: false, authenticated: false })
+  }
+
+  // Admin allowlist — skip the onboarding modal entirely. Lets demo/contractor
+  // accounts use the product immediately without being bounced into the
+  // trial-signup flow.
+  if (isAdminEmail(session.user.email)) {
+    return NextResponse.json({
+      authenticated: true,
+      needsOnboarding: false,
+      surveyAlreadyCompleted: false,
+    })
   }
 
   const { data, error } = await supabase
